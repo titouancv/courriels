@@ -90,17 +90,17 @@ function App() {
       if (activeSearch) {
         query = activeSearch;
       } else {
-        switch (currentFolder) {
-          case 'notifications':
-            query = 'label:INBOX -from:me';
-            break;
-          case 'conversations':
-            query = 'label:INBOX OR label:SENT';
-            break;
-          case 'trash':
-            query = 'label:TRASH';
-            break;
-        }
+        // switch (currentFolder) {
+        //   case 'notifications':
+        //     query = 'label:INBOX -from:me';
+        //     break;
+        //   case 'conversations':
+        //     query = 'label:INBOX OR label:SENT';
+        //     break;
+        //   case 'trash':
+        //     query = 'label:TRASH';
+        //     break;
+        // }
       } 
 
       const listData = await fetchThreadsList(accessToken, query, pageToken);

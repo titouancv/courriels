@@ -164,9 +164,13 @@ export async function fetchThreadDetails(accessToken: string, threadId: string):
 
   // Use the last message for thread-level info
   const lastMsg = threadData.messages[threadData.messages.length - 1];
-  const headers = lastMsg.payload.headers;
-  const getHeader = (name: string) => headers.find((h: { name: string; value: string }) => h.name === name)?.value || '';
-  const subject = getHeader('Subject');
+  
+  // Use the first message for the subject to keep the original conversation title
+  const firstMsg = threadData.messages[0];
+  const firstHeaders = firstMsg.payload.headers;
+  const getFirstHeader = (name: string) => firstHeaders.find((h: { name: string; value: string }) => h.name === name)?.value || '';
+  const subject = getFirstHeader('Subject');
+
   const labelIds = lastMsg.labelIds || [];
   
   let folder: 'inbox' | 'sent' | 'drafts' | 'trash' = 'inbox';
