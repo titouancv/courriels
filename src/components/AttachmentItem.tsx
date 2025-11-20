@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import type { Attachment } from '../types'
 import { Paperclip, Download } from 'lucide-react'
 import { Button } from '../design-system/Button'
+import { clsx } from 'clsx'
 
 interface AttachmentItemProps {
     attachment: Attachment
@@ -10,12 +11,14 @@ interface AttachmentItemProps {
         messageId: string,
         attachmentId: string
     ) => Promise<string | null>
+    onImageClick?: (imageUrl: string) => void
 }
 
 export function AttachmentItem({
     attachment,
     messageId,
     onFetchAttachment,
+    onImageClick,
 }: AttachmentItemProps) {
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const isImage = attachment.mimeType.startsWith('image/')
@@ -44,7 +47,11 @@ export function AttachmentItem({
                 <img
                     src={previewUrl}
                     alt={attachment.filename}
-                    className="max-h-64 rounded-lg border border-[#E9E9E7] bg-[#F7F7F5] object-contain dark:border-[#2F2F2F] dark:bg-[#202020]"
+                    onClick={() => onImageClick?.(previewUrl)}
+                    className={clsx(
+                        'max-h-64 rounded-lg border border-[#E9E9E7] bg-[#F7F7F5] object-contain dark:border-[#2F2F2F] dark:bg-[#202020]',
+                        onImageClick && 'cursor-pointer hover:opacity-90'
+                    )}
                 />
                 <div className="absolute top-2 right-2 rounded border border-[#E9E9E7] bg-white/90 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 dark:border-[#2F2F2F] dark:bg-[#191919]/90">
                     <Button

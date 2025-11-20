@@ -1,8 +1,14 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
 import type { Email, FolderId } from '../types'
-import { getEmailsForFolder } from '../services/emailService'
-import { trashThread, modifyThreadLabels } from '../services/gmailApi'
+import { getEmailsForFolder, getEmailDetails } from '../services/emailService'
+import {
+    trashThread,
+    modifyThreadLabels,
+    getUnreadCountByCategory,
+} from '../services/gmailApi'
 
 export function useEmails(accessToken: string | null) {
     const [conversationEmails, setConversationEmails] = useState<Email[]>([])
@@ -10,6 +16,11 @@ export function useEmails(accessToken: string | null) {
     const [trashEmails, setTrashEmails] = useState<Email[]>([])
     const [isRefreshing, setIsRefreshing] = useState(false)
     const [isLoading, setIsLoading] = useState(true)
+    const [unreadCounts, setUnreadCounts] = useState<{
+        conversations: number
+        notifications: number
+        trash: number
+    }>({ conversations: 0, notifications: 0, trash: 0 })
     const [nextPageToken, setNextPageToken] = useState<string | null>(null)
     const fetchIdRef = useRef(0)
     const activeRequestsRef = useRef(0)
@@ -100,6 +111,20 @@ export function useEmails(accessToken: string | null) {
                     refreshEmails('trash', undefined, undefined, 'trash'),
                 ])
                 setIsLoading(false)
+                setUnreadCounts({
+                    conversations: await getUnreadCountByCategory(
+                        accessToken,
+                        'from:me is:unread'
+                    ),
+                    notifications: await getUnreadCountByCategory(
+                        accessToken,
+                        'is:unread'
+                    ),
+                    trash: await getUnreadCountByCategory(
+                        accessToken,
+                        'in:trash is:unread'
+                    ),
+                })
             }
             init()
         } else {
@@ -107,26 +132,7 @@ export function useEmails(accessToken: string | null) {
             setNotificationEmails([])
             setTrashEmails([])
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [accessToken])
-
-    const unreadCounts = {
-        conversations: conversationEmails.filter(
-            (email) =>
-                (email.messages.length > 1 || email.folder === 'sent') &&
-                email.folder !== 'trash' &&
-                !email.read
-        ).length,
-        notifications: notificationEmails.filter(
-            (email) =>
-                email.messages.length === 1 &&
-                email.folder === 'inbox' &&
-                !email.read
-        ).length,
-        trash: trashEmails.filter(
-            (email) => email.folder === 'trash' && !email.read
-        ).length,
-    }
 
     const deleteEmail = async (
         emailId: string,
@@ -175,6 +181,13 @@ export function useEmails(accessToken: string | null) {
             else if (folder === 'trash') setTrashEmails(update)
         }
 
+        const previousEmails =
+            folder === 'conversations'
+                ? conversationEmails
+                : folder === 'notifications'
+                  ? notificationEmails
+                  : trashEmails
+
         // Optimistic update
         setEmails((prev) =>
             prev.map((e) => (e.id === emailId ? { ...e, read: true } : e))
@@ -184,6 +197,39 @@ export function useEmails(accessToken: string | null) {
             await modifyThreadLabels(accessToken, threadId, [], ['UNREAD'])
         } catch (error) {
             console.error('Failed to mark as read:', error)
+            toast.error('Failed to mark as read')
+            setEmails(() => previousEmails)
+        }
+    }
+
+    const loadFullEmail = async (emailId: string, folder: FolderId) => {
+        if (!accessToken) return
+
+        const setEmails = (update: (prev: Email[]) => Email[]) => {
+            if (folder === 'conversations') setConversationEmails(update)
+            else if (folder === 'notifications') setNotificationEmails(update)
+            else if (folder === 'trash') setTrashEmails(update)
+        }
+
+        const emails =
+            folder === 'conversations'
+                ? conversationEmails
+                : folder === 'notifications'
+                  ? notificationEmails
+                  : trashEmails
+
+        const email = emails.find((e) => e.id === emailId)
+        if (!email || email.isFullDetails) return
+
+        try {
+            const fullEmail = await getEmailDetails(accessToken, email.threadId)
+            if (fullEmail) {
+                setEmails((prev) =>
+                    prev.map((e) => (e.id === emailId ? fullEmail : e))
+                )
+            }
+        } catch (error) {
+            console.error('Failed to load full email:', error)
         }
     }
 
@@ -201,5 +247,6 @@ export function useEmails(accessToken: string | null) {
         setTrashEmails,
         deleteEmail,
         markAsRead,
+        loadFullEmail,
     }
 }

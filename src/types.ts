@@ -38,6 +38,7 @@ export interface Email {
     read: boolean
     labels: string[]
     folder: 'inbox' | 'sent' | 'drafts' | 'trash'
+    isFullDetails?: boolean
 }
 
 export type FolderId = 'notifications' | 'conversations' | 'trash'

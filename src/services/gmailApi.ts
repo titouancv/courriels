@@ -39,10 +39,11 @@ export async function fetchThreadsList(
 
 export async function fetchThreadDetailsRaw(
     accessToken: string,
-    threadId: string
+    threadId: string,
+    format: 'full' | 'metadata' | 'minimal' = 'full'
 ) {
     const threadResponse = await fetch(
-        `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}`,
+        `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}?format=${format}`,
         { headers: { Authorization: `Bearer ${accessToken}` } }
     )
     if (!threadResponse.ok) {
@@ -207,4 +208,24 @@ export async function modifyThreadLabels(
     )
     if (!response.ok) throw new Error('Failed to modify thread labels')
     return await response.json()
+}
+
+export async function getUnreadCountByCategory(
+    accessToken: string,
+    query: string
+): Promise<number> {
+    const url = `https://gmail.googleapis.com/gmail/v1/users/me/threads?q=${encodeURIComponent(query)}`
+
+    const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+    })
+
+    if (!response.ok) {
+        throw new Error('Failed to fetch unread count')
+    }
+
+    const data = await response.json()
+
+    // Gmail renvoie resultSizeEstimate → nombre de threads correspondant
+    return data.resultSizeEstimate ?? 0
 }

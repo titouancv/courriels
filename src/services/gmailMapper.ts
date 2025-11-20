@@ -68,17 +68,11 @@ export function getAttachments(payload: any): Attachment[] {
 
 export function cleanEmailContent(html: string) {
     try {
-        // First sanitize the HTML to prevent XSS
+        // Sanitize first to ensure valid HTML, but keep attributes we need for detection
         const sanitized = DOMPurify.sanitize(html, {
             USE_PROFILES: { html: true },
-            FORBID_TAGS: [
-                'script',
-                'style',
-                'iframe',
-                'object',
-                'embed',
-                'form',
-            ],
+            ADD_ATTR: ['target', 'class', 'style', 'id'],
+            FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form'],
             FORBID_ATTR: ['onmouseover', 'onclick', 'onerror'],
         })
 
@@ -86,26 +80,39 @@ export function cleanEmailContent(html: string) {
         const doc = parser.parseFromString(sanitized, 'text/html')
 
         // Remove Gmail extra quotes
-        const gmailQuotes = doc.querySelectorAll('.gmail_quote')
-        gmailQuotes.forEach((quote) => quote.remove())
+        doc.querySelectorAll('.gmail_quote').forEach((el) => el.remove())
+        doc.querySelectorAll('.gmail_attr').forEach((el) => el.remove())
 
-        // Remove blockquotes which often contain the history
-        const blockquotes = doc.querySelectorAll('blockquote')
-        blockquotes.forEach((quote) => quote.remove())
+        // Remove blockquotes
+        doc.querySelectorAll('blockquote').forEach((el) => el.remove())
 
         // Remove ProtonMail quotes
-        const protonQuotes = doc.querySelectorAll('.protonmail_quote')
-        protonQuotes.forEach((quote) => quote.remove())
+        doc.querySelectorAll('.protonmail_quote').forEach((el) => el.remove())
+
+        // Remove elements with border-left style (often used for quotes)
+        const divs = doc.querySelectorAll('div')
+        divs.forEach((div) => {
+            const style = div.getAttribute('style')
+            if (
+                style &&
+                (style.includes('border-left') || style.includes('border-left'))
+            ) {
+                // Check if it looks like a quote (usually solid line)
+                if (style.includes('solid')) {
+                    div.remove()
+                }
+            }
+        })
 
         return doc.body.innerHTML
     } catch (e) {
         console.error('Error cleaning email content:', e)
-        return DOMPurify.sanitize(html) // Fallback to just sanitizing
+        return DOMPurify.sanitize(html)
     }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function mapThreadToEmail(threadData: any): Email {
+export function mapThreadToEmail(threadData: any, isFullDetails = true): Email {
     // Process messages in the thread
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const messages = threadData.messages.map((msgData: any) => {
@@ -158,6 +165,11 @@ export function mapThreadToEmail(threadData: any): Email {
     // Use the last message for thread-level info
     const lastMsg = threadData.messages[threadData.messages.length - 1]
 
+    // Check if any message in the thread is unread
+    const isUnread = threadData.messages.some((msg: any) =>
+        msg.labelIds?.includes('UNREAD')
+    )
+
     // Use the first message for the subject to keep the original conversation title
     const firstMsg = threadData.messages[0]
     const firstHeaders = firstMsg.payload.headers
@@ -183,7 +195,7 @@ export function mapThreadToEmail(threadData: any): Email {
         preview: lastMsg.snippet,
         messages: messages,
         date: messages[messages.length - 1].date,
-        read: !labelIds.includes('UNREAD'),
+        read: !isUnread,
         labels: labelIds.filter(
             (l: string) =>
                 ![
@@ -197,5 +209,6 @@ export function mapThreadToEmail(threadData: any): Email {
                 ].includes(l)
         ),
         folder: folder,
+        isFullDetails,
     }
 }

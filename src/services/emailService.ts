@@ -31,27 +31,53 @@ export async function getEmailsForFolder(
         return { emails: [], nextPageToken: null }
     }
 
-    const BATCH_SIZE = 5
-    const results: (Email | null)[] = []
+    // Concurrency limit to avoid hitting Gmail API rate limits too hard
+    // while maximizing throughput.
+    const CONCURRENCY = 10
+    const threads = listData.threads
+    const results = new Array(threads.length).fill(null)
+    const iterator = threads.entries()
 
-    for (let i = 0; i < listData.threads.length; i += BATCH_SIZE) {
-        const batch = listData.threads.slice(i, i + BATCH_SIZE)
-        const batchPromises = batch.map((thread: { id: string }) =>
-            fetchThreadDetailsRaw(accessToken, thread.id)
-                .then(mapThreadToEmail)
-                .catch((error) => {
-                    console.error(`Failed to fetch thread ${thread.id}:`, error)
-                    return null
-                })
-        )
-        const batchResults = await Promise.all(batchPromises)
-        results.push(...batchResults)
+    const worker = async () => {
+        for (const [index, thread] of iterator) {
+            try {
+                const data = await fetchThreadDetailsRaw(
+                    accessToken,
+                    thread.id,
+                    'metadata'
+                )
+                results[index] = mapThreadToEmail(data, false)
+            } catch (error) {
+                console.error(`Failed to fetch thread ${thread.id}:`, error)
+                results[index] = null
+            }
+        }
     }
+
+    // Start workers
+    const workers = Array(CONCURRENCY)
+        .fill(null)
+        .map(() => worker())
+
+    await Promise.all(workers)
 
     const emails = results.filter((email): email is Email => email !== null)
 
     return {
         emails,
         nextPageToken: listData.nextPageToken || null,
+    }
+}
+
+export async function getEmailDetails(
+    accessToken: string,
+    threadId: string
+): Promise<Email | null> {
+    try {
+        const data = await fetchThreadDetailsRaw(accessToken, threadId, 'full')
+        return mapThreadToEmail(data, true)
+    } catch (error) {
+        console.error(`Failed to fetch thread details ${threadId}:`, error)
+        return null
     }
 }

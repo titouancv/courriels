@@ -106,16 +106,6 @@ export function EmailList({
                             <span className="text-sm text-[#787774] dark:text-[#9B9A97]">
                                 {getDescription()}
                             </span>
-                            {filteredEmails.length > 0 && (
-                                <>
-                                    <span className="text-xs text-[#787774] dark:text-[#9B9A97]">
-                                        •
-                                    </span>
-                                    <span className="text-xs text-[#787774] dark:text-[#9B9A97]">
-                                        {filteredEmails.length} messages
-                                    </span>
-                                </>
-                            )}
                         </div>
                     </div>
                     <div className="flex items-center gap-1">
@@ -202,14 +192,17 @@ export function EmailList({
                                 <div
                                     onClick={() => onSelectEmail(email.id)}
                                     className={clsx(
-                                        'flex cursor-pointer gap-3 border-b border-[#E9E9E7] p-4 transition-colors hover:bg-[#F7F7F5] dark:border-[#2F2F2F] dark:hover:bg-[#202020]',
+                                        'relative flex cursor-pointer gap-3 border-b border-[#E9E9E7] p-4 transition-colors hover:bg-[#F7F7F5] dark:border-[#2F2F2F] dark:hover:bg-[#202020]',
                                         selectedEmailId === email.id
                                             ? 'bg-[#F7F7F5] dark:bg-[#202020]'
                                             : 'bg-white dark:bg-[#191919]',
                                         !email.read &&
-                                            'bg-[#00712D]/5 dark:bg-[#00712D]/20'
+                                            'bg-[#F0FDF4] dark:bg-[#00712D]/10'
                                     )}
                                 >
+                                    {!email.read && (
+                                        <div className="absolute top-0 bottom-0 left-0 w-1 bg-[#00712D]" />
+                                    )}
                                     <div className="mt-1 flex flex-shrink-0 -space-x-2">
                                         {visibleSenders.map((sender, i) => (
                                             <div

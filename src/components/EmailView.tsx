@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import type { Email } from '../types'
+import { createPortal } from 'react-dom'
+import type { Email, Attachment } from '../types'
 import { X, ArrowLeft } from 'lucide-react'
 import { clsx } from 'clsx'
 import { Button } from '../design-system/Button'
@@ -7,6 +8,7 @@ import { formatEmailDate } from '../utils/date'
 import { MessageContent } from './MessageContent'
 import { AttachmentItem } from './AttachmentItem'
 import { ReplyBox } from './ReplyBox'
+import { ImageStack, Lightbox } from './ImageGallery'
 
 import {
     FileCode,
@@ -14,6 +16,7 @@ import {
     Forward,
     Trash2,
     MailOpen,
+    Info,
 } from 'lucide-react'
 
 interface EmailViewProps {
@@ -42,6 +45,12 @@ export function EmailView({
 }: EmailViewProps) {
     const [isSending, setIsSending] = useState(false)
     const [showOriginal, setShowOriginal] = useState(false)
+    const [showDetails, setShowDetails] = useState(false)
+    const [lightboxState, setLightboxState] = useState<{
+        images: Attachment[]
+        initialIndex: number
+        messageId: string
+    } | null>(null)
     const [activeMenuMessageId, setActiveMenuMessageId] = useState<
         string | null
     >(null)
@@ -128,6 +137,13 @@ export function EmailView({
                         <Button
                             variant="icon"
                             size="icon"
+                            onClick={() => setShowDetails(true)}
+                            title="View details"
+                            icon={Info}
+                        />
+                        <Button
+                            variant="icon"
+                            size="icon"
                             onClick={onClose}
                             title="Close"
                             icon={X}
@@ -193,7 +209,9 @@ export function EmailView({
                                     <MessageContent
                                         content={message.content}
                                         originalContent={
-                                            message.originalContent
+                                            showOriginal
+                                                ? message.originalContent
+                                                : undefined
                                         }
                                         attachments={message.attachments}
                                         messageId={message.id}
@@ -203,80 +221,132 @@ export function EmailView({
                                     {message.attachments &&
                                         message.attachments.length > 0 && (
                                             <div className="mt-4 border-t border-black/5 pt-4 dark:border-white/10">
-                                                {message.attachments
-                                                    .filter(
-                                                        (a) =>
-                                                            !a.contentId ||
-                                                            !a.mimeType.startsWith(
-                                                                'image/'
-                                                            )
+                                                {(() => {
+                                                    const images =
+                                                        message.attachments.filter(
+                                                            (a) =>
+                                                                !a.contentId &&
+                                                                a.mimeType.startsWith(
+                                                                    'image/'
+                                                                )
+                                                        )
+                                                    const others =
+                                                        message.attachments.filter(
+                                                            (a) =>
+                                                                !a.contentId &&
+                                                                !a.mimeType.startsWith(
+                                                                    'image/'
+                                                                )
+                                                        )
+
+                                                    return (
+                                                        <>
+                                                            {images.length >
+                                                                0 && (
+                                                                <div className="mb-4">
+                                                                    <ImageStack
+                                                                        images={
+                                                                            images
+                                                                        }
+                                                                        messageId={
+                                                                            message.id
+                                                                        }
+                                                                        onFetchAttachment={
+                                                                            onFetchAttachment
+                                                                        }
+                                                                        onOpenLightbox={(
+                                                                            index
+                                                                        ) =>
+                                                                            setLightboxState(
+                                                                                {
+                                                                                    images,
+                                                                                    initialIndex:
+                                                                                        index,
+                                                                                    messageId:
+                                                                                        message.id,
+                                                                                }
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                            {others.length >
+                                                                0 && (
+                                                                <div className="flex flex-wrap gap-4">
+                                                                    {others.map(
+                                                                        (
+                                                                            attachment
+                                                                        ) => (
+                                                                            <AttachmentItem
+                                                                                key={
+                                                                                    attachment.id
+                                                                                }
+                                                                                attachment={
+                                                                                    attachment
+                                                                                }
+                                                                                messageId={
+                                                                                    message.id
+                                                                                }
+                                                                                onFetchAttachment={
+                                                                                    onFetchAttachment
+                                                                                }
+                                                                            />
+                                                                        )
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </>
                                                     )
-                                                    .map((attachment) => (
-                                                        <AttachmentItem
-                                                            key={attachment.id}
-                                                            attachment={
-                                                                attachment
-                                                            }
-                                                            messageId={
-                                                                message.id
-                                                            }
-                                                            onFetchAttachment={
-                                                                onFetchAttachment
-                                                            }
-                                                        />
-                                                    ))}
+                                                })()}
                                             </div>
                                         )}
                                 </div>
-                                {message.originalContent && (
-                                    <div className="relative">
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() =>
-                                                setActiveMenuMessageId(
-                                                    activeMenuMessageId ===
-                                                        message.id
-                                                        ? null
-                                                        : message.id
-                                                )
-                                            }
-                                            className="h-8 w-8 text-[#9B9A97] hover:bg-[#EFEFED] hover:text-[#37352F] dark:hover:bg-[#2F2F2F] dark:hover:text-[#D4D4D4]"
-                                            icon={MoreHorizontal}
-                                        />
-                                        {activeMenuMessageId === message.id && (
-                                            <>
-                                                <div
-                                                    className="fixed inset-0 z-10"
-                                                    onClick={() =>
+
+                                <div className="relative">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() =>
+                                            setActiveMenuMessageId(
+                                                activeMenuMessageId ===
+                                                    message.id
+                                                    ? null
+                                                    : message.id
+                                            )
+                                        }
+                                        className="h-8 w-8 text-[#9B9A97] hover:bg-[#EFEFED] hover:text-[#37352F] dark:hover:bg-[#2F2F2F] dark:hover:text-[#D4D4D4]"
+                                        icon={MoreHorizontal}
+                                    />
+                                    {activeMenuMessageId === message.id && (
+                                        <>
+                                            <div
+                                                className="fixed inset-0 z-10"
+                                                onClick={() =>
+                                                    setActiveMenuMessageId(null)
+                                                }
+                                            />
+                                            <div
+                                                className={clsx(
+                                                    'absolute z-20 mt-1 w-48 rounded-md border border-[#E9E9E7] bg-white py-1 shadow-lg dark:border-[#2F2F2F] dark:bg-[#191919]',
+                                                    isMe ? 'right-0' : 'left-0'
+                                                )}
+                                            >
+                                                <button
+                                                    onClick={() => {
+                                                        onForward(
+                                                            `Fwd: ${email.subject}`,
+                                                            `\n\n---------- Forwarded message ---------\nFrom: ${message.sender.name} <${message.sender.email}>\nDate: ${formatEmailDate(message.date, { includeTime: true })}\nSubject: ${email.subject}\nTo: ${currentUserEmail}\n\n${message.content}`
+                                                        )
                                                         setActiveMenuMessageId(
                                                             null
                                                         )
-                                                    }
-                                                />
-                                                <div
-                                                    className={clsx(
-                                                        'absolute z-20 mt-1 w-48 rounded-md border border-[#E9E9E7] bg-white py-1 shadow-lg dark:border-[#2F2F2F] dark:bg-[#191919]',
-                                                        isMe
-                                                            ? 'right-0'
-                                                            : 'left-0'
-                                                    )}
+                                                    }}
+                                                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-[#37352F] hover:bg-[#F7F7F5] dark:text-[#D4D4D4] dark:hover:bg-[#202020]"
                                                 >
-                                                    <button
-                                                        onClick={() => {
-                                                            onForward(
-                                                                `Fwd: ${email.subject}`,
-                                                                `\n\n---------- Forwarded message ---------\nFrom: ${message.sender.name} <${message.sender.email}>\nDate: ${formatEmailDate(message.date, { includeTime: true })}\nSubject: ${email.subject}\nTo: ${currentUserEmail}\n\n${message.content}`
-                                                            )
-                                                            setActiveMenuMessageId(
-                                                                null
-                                                            )
-                                                        }}
-                                                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-[#37352F] hover:bg-[#F7F7F5] dark:text-[#D4D4D4] dark:hover:bg-[#202020]"
-                                                    >
-                                                        <Forward className="h-4 w-4" />
-                                                        Forward
-                                                    </button>
+                                                    <Forward className="h-4 w-4" />
+                                                    Forward
+                                                </button>
+                                                {message.originalContent && (
                                                     <button
                                                         onClick={() => {
                                                             setShowOriginal(
@@ -293,17 +363,52 @@ export function EmailView({
                                                             ? 'Show cleaned view'
                                                             : 'Show original format'}
                                                     </button>
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
-                                )}
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     )
                 })}
                 <div ref={messagesEndRef} />
             </div>
+
+            {showDetails &&
+                createPortal(
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+                        <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-xl bg-white shadow-2xl dark:bg-[#191919]">
+                            <div className="flex items-center justify-between border-b border-[#E9E9E7] p-4 dark:border-[#2F2F2F]">
+                                <h2 className="text-lg font-semibold text-[#37352F] dark:text-[#D4D4D4]">
+                                    Message Details
+                                </h2>
+                                <Button
+                                    variant="icon"
+                                    size="icon"
+                                    onClick={() => setShowDetails(false)}
+                                    icon={X}
+                                />
+                            </div>
+                            <div className="flex-1 overflow-auto p-4">
+                                <pre className="rounded-lg bg-[#F7F7F5] p-4 font-mono text-xs break-words whitespace-pre-wrap text-[#37352F] dark:bg-[#202020] dark:text-[#D4D4D4]">
+                                    {JSON.stringify(email, null, 2)}
+                                </pre>
+                            </div>
+                        </div>
+                    </div>,
+                    document.body
+                )}
+
+            {lightboxState && (
+                <Lightbox
+                    images={lightboxState.images}
+                    initialIndex={lightboxState.initialIndex}
+                    messageId={lightboxState.messageId}
+                    onFetchAttachment={onFetchAttachment}
+                    onClose={() => setLightboxState(null)}
+                />
+            )}
 
             <ReplyBox onSend={handleSend} isSending={isSending} />
         </div>

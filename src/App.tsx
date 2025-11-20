@@ -28,6 +28,7 @@ function App() {
         unreadCounts,
         deleteEmail,
         markAsRead,
+        loadFullEmail,
     } = useEmails(accessToken)
 
     const [currentFolder, setCurrentFolder] = useState<FolderId>(() => {
@@ -97,6 +98,12 @@ function App() {
 
         return () => clearTimeout(timer)
     }, [searchQuery, currentFolder, accessToken, refreshEmails])
+
+    useEffect(() => {
+        if (selectedEmailId && accessToken) {
+            loadFullEmail(selectedEmailId, currentFolder)
+        }
+    }, [selectedEmailId, currentFolder, accessToken, loadFullEmail])
 
     useEffect(() => {
         if (typeof window === 'undefined') return
@@ -328,6 +335,16 @@ function App() {
                                 onSelectEmail={(id) => {
                                     setSelectedEmailId(id)
                                     setIsComposeOpen(false)
+                                    const email = filteredEmails.find(
+                                        (e) => e.id === id
+                                    )
+                                    if (email && !email.read) {
+                                        markAsRead(
+                                            email.id,
+                                            email.threadId,
+                                            currentFolder
+                                        )
+                                    }
                                 }}
                                 onRefresh={() =>
                                     refreshEmails(
