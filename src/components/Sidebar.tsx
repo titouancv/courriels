@@ -1,34 +1,50 @@
 import React from 'react'
 import type { FolderId, User } from '../types'
-import { Bell, MessageSquare, Trash2, LogIn } from 'lucide-react'
+import { Bell, MessageSquare, Trash2 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { Button } from '../design-system/Button'
 
 interface SidebarProps {
     currentFolder: FolderId
     onFolderChange: (folder: FolderId) => void
-    unreadCounts: Record<FolderId, number>
     user: User | null
     onOpenSettings: () => void
+    unreadCounts: Record<FolderId, number>
 }
 
 export function Sidebar({
     currentFolder,
     onFolderChange,
-    unreadCounts,
     user,
     onOpenSettings,
+    unreadCounts,
 }: SidebarProps) {
-    const folders: { id: FolderId; icon: React.ElementType; label: string }[] =
-        [
-            {
-                id: 'conversations',
-                icon: MessageSquare,
-                label: 'Conversations',
-            },
-            { id: 'notifications', icon: Bell, label: 'Notifications' },
-            { id: 'trash', icon: Trash2, label: 'Trash' },
-        ]
+    const folders: {
+        id: FolderId
+        icon: React.ElementType
+        label: string
+        unreadCount?: number
+    }[] = [
+        {
+            id: 'conversations',
+            icon: MessageSquare,
+            label: 'Conversations',
+        },
+        {
+            id: 'notifications',
+            icon: Bell,
+            label: 'Notifications',
+        },
+        {
+            id: 'trash',
+            icon: Trash2,
+            label: 'Trash',
+        },
+    ]
+
+    // const isUnreadCount = (folderId: FolderId) => {
+    //     return (unreadCounts[folderId] ?? 0) > 0
+    // }
 
     return (
         <div className="flex h-screen w-64 flex-col border-r border-[#E9E9E7] bg-[#F7F7F5] text-[#37352F] transition-colors duration-200 dark:border-[#2F2F2F] dark:bg-[#202020] dark:text-[#D4D4D4]">
@@ -49,22 +65,23 @@ export function Sidebar({
                             icon={folder.icon}
                         >
                             <span>{folder.label}</span>
-                            {unreadCounts[folder.id] > 0 && (
-                                <span className="ml-auto text-xs text-[#787774] dark:text-[#9B9A97]">
+                            {/* {isUnreadCount(folder.id) && (
+                                <span className="ml-auto rounded-full bg-red-500 px-2 py-0.5 text-xs font-semibold text-white">
                                     {unreadCounts[folder.id]}
                                 </span>
-                            )}
+                            )} */}
                         </Button>
                     ))}
                 </div>
             </div>
 
             <div className="mt-auto border-t border-[#E9E9E7] p-4 dark:border-[#2F2F2F]">
-                <div
-                    className="mb-4 flex cursor-pointer items-center gap-2 rounded px-2 py-1 transition-colors hover:bg-[#EFEFED] dark:hover:bg-[#2F2F2F]"
+                <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-2 px-2 py-1 hover:bg-[#EFEFED] dark:hover:bg-[#2F2F2F]"
                     onClick={() => user && onOpenSettings()}
                 >
-                    {user ? (
+                    {user && (
                         <>
                             {user.picture ? (
                                 <img
@@ -81,17 +98,8 @@ export function Sidebar({
                                 {user.name}
                             </span>
                         </>
-                    ) : (
-                        <>
-                            <div className="flex h-5 w-5 items-center justify-center rounded bg-gray-400 text-white">
-                                <LogIn className="h-3 w-3" />
-                            </div>
-                            <span className="truncate text-sm font-medium">
-                                Connect Gmail
-                            </span>
-                        </>
                     )}
-                </div>
+                </Button>
             </div>
         </div>
     )

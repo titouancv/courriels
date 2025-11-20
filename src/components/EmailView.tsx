@@ -1,15 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
 import type { Email } from '../types'
-import { X, Send } from 'lucide-react'
+import { X } from 'lucide-react'
 import { clsx } from 'clsx'
 import { Button } from '../design-system/Button'
 import { formatEmailDate } from '../utils/date'
 import { MessageContent } from './MessageContent'
 import { AttachmentItem } from './AttachmentItem'
+import { ReplyBox } from './ReplyBox'
 
 interface EmailViewProps {
     email: Email | null
-    onSendReply: (body: string) => Promise<void>
+    onSendReply: (body: string, attachments: File[]) => Promise<void>
     currentUserEmail?: string
     onFetchAttachment: (
         messageId: string,
@@ -25,7 +26,6 @@ export function EmailView({
     onFetchAttachment,
     onClose,
 }: EmailViewProps) {
-    const [replyBody, setReplyBody] = useState('')
     const [isSending, setIsSending] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -41,20 +41,25 @@ export function EmailView({
         return null
     }
 
-    const handleSend = async () => {
-        if (!replyBody.trim()) return
+    const handleSend = async (body: string, attachments: File[]) => {
         setIsSending(true)
         try {
-            await onSendReply(replyBody)
-            setReplyBody('')
+            await onSendReply(body, attachments)
         } finally {
             setIsSending(false)
         }
     }
 
     const uniqueNames = Array.from(
-        new Set(email.messages.map((m) => m.sender.name))
+        new Set(
+            email.messages
+                .filter((m) => m.sender.email !== currentUserEmail)
+                .map((m) => m.sender.name)
+        )
     )
+
+    const displayNames =
+        uniqueNames.length > 0 ? uniqueNames.join(', ') : email.sender.name
 
     return (
         <div className="flex h-full flex-1 flex-col overflow-y-auto border-l border-[#E9E9E7] bg-white dark:border-[#2F2F2F] dark:bg-[#191919]">
@@ -68,7 +73,7 @@ export function EmailView({
                             {email.subject}
                         </h1>
                         <div className="mt-1 truncate text-sm text-[#787774] dark:text-[#9B9A97]">
-                            {uniqueNames.join(', ')}
+                            {displayNames}
                         </div>
                     </div>
                     <div className="flex flex-shrink-0 items-center gap-2 text-[#787774] dark:text-[#9B9A97]">
@@ -170,29 +175,7 @@ export function EmailView({
                 <div ref={messagesEndRef} />
             </div>
 
-            <div className="mt-auto border-t border-[#E9E9E7] bg-white p-4 dark:border-[#2F2F2F] dark:bg-[#191919]">
-                <div className="flex items-end gap-2">
-                    <textarea
-                        value={replyBody}
-                        onChange={(e) => setReplyBody(e.target.value)}
-                        placeholder="Type a message..."
-                        className="min-h-[80px] flex-1 resize-none rounded-lg border border-[#E9E9E7] bg-white p-3 text-[#37352F] placeholder-[#9B9A97] focus:ring-2 focus:ring-[#00712D]/20 focus:outline-none dark:border-[#2F2F2F] dark:bg-[#202020] dark:text-[#D4D4D4]"
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                                handleSend()
-                            }
-                        }}
-                    />
-                    <Button
-                        onClick={handleSend}
-                        disabled={!replyBody.trim() || isSending}
-                        variant="primary"
-                        size="icon"
-                        icon={Send}
-                        className="mb-1"
-                    />
-                </div>
-            </div>
+            <ReplyBox onSend={handleSend} isSending={isSending} />
         </div>
     )
 }

@@ -17,17 +17,11 @@ import {
     fetchUserInfo as fetchUserInfoService,
     sendEmailMessage,
     fetchAttachmentData,
-    fetchUnreadCount,
 } from './services/gmail'
 
 function App() {
     const [currentFolder, setCurrentFolder] =
         useState<FolderId>('conversations')
-    const [unreadCounts, setUnreadCounts] = useState<Record<FolderId, number>>({
-        conversations: 0,
-        notifications: 0,
-        trash: 0,
-    })
     const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null)
     const [user, setUser] = useState<User | null>(null)
     const [accessToken, setAccessToken] = useState<string | null>(null)
@@ -57,6 +51,11 @@ function App() {
             )
         }
         return false
+    })
+    const [unreadCounts, setUnreadCounts] = useState<Record<FolderId, number>>({
+        conversations: 0,
+        notifications: 0,
+        trash: 0,
     })
     const fetchIdRef = useRef(0)
 
@@ -223,6 +222,29 @@ function App() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [accessToken, currentFolder])
 
+    useEffect(() => {
+        emails.map((email) => {
+            console.log(email.id, email.labels)
+        })
+        setUnreadCounts({
+            conversations: emails.filter(
+                (email) =>
+                    (email.messages.length > 1 || email.folder === 'sent') &&
+                    email.folder !== 'trash' &&
+                    !email.read
+            ).length,
+            notifications: emails.filter(
+                (email) =>
+                    email.messages.length === 1 &&
+                    email.folder === 'inbox' &&
+                    !email.read
+            ).length,
+            trash: emails.filter(
+                (email) => email.folder === 'trash' && !email.read
+            ).length,
+        })
+    }, [emails])
+
     const handleSendEmail = async (
         to: string,
         subject: string,
@@ -231,7 +253,8 @@ function App() {
             threadId?: string
             inReplyTo?: string
             references?: string
-        }
+        },
+        attachments: File[] = []
     ) => {
         if (!accessToken) return
 
@@ -247,7 +270,8 @@ function App() {
                 body,
                 threadId,
                 inReplyTo,
-                references
+                references,
+                attachments
             )
         } catch (error) {
             console.error('Error sending email:', error)
@@ -255,7 +279,7 @@ function App() {
         }
     }
 
-    const handleInlineReply = async (body: string) => {
+    const handleInlineReply = async (body: string, attachments: File[]) => {
         if (!selectedEmail) return
 
         const lastMessage =
@@ -273,7 +297,7 @@ function App() {
                 : lastMessage.messageIdHeader,
         }
 
-        await handleSendEmail(to, subject, body, replyContext)
+        await handleSendEmail(to, subject, body, replyContext, attachments)
         refreshEmails()
     }
 
@@ -297,37 +321,6 @@ function App() {
         refreshEmails(undefined, query)
     }
 
-    useEffect(() => {
-        if (!accessToken) return
-
-        const updateUnreadCounts = async () => {
-            try {
-                const [conversations, notifications, trash] = await Promise.all(
-                    [
-                        fetchUnreadCount(
-                            accessToken,
-                            'label:INBOX OR label:SENT'
-                        ),
-                        fetchUnreadCount(accessToken, 'label:INBOX -from:me'),
-                        fetchUnreadCount(accessToken, 'label:TRASH'),
-                    ]
-                )
-
-                setUnreadCounts({
-                    conversations,
-                    notifications,
-                    trash,
-                })
-            } catch (error) {
-                console.error('Failed to fetch unread counts:', error)
-            }
-        }
-
-        updateUnreadCounts()
-        const interval = setInterval(updateUnreadCounts, 60000) // Update every minute
-        return () => clearInterval(interval)
-    }, [accessToken])
-
     if (!accessToken) {
         return <LoginPage />
     }
@@ -341,12 +334,12 @@ function App() {
                     setSearchQuery('')
                     setIsSettingsOpen(false)
                 }}
-                unreadCounts={unreadCounts}
                 user={user}
                 onOpenSettings={() => {
                     setIsSettingsOpen(true)
                     setSelectedEmailId(null)
                 }}
+                unreadCounts={unreadCounts}
             />
 
             <div className="flex min-w-0 flex-1 flex-col">

@@ -88,20 +88,18 @@ export function EmailList({
                             ? uniqueNames.join(', ')
                             : email.sender.name
 
-                    let avatarName = email.sender.name
-                    let avatarUrl = undefined
+                    const uniqueParticipants = Array.from(
+                        new Map(
+                            otherSenders.map((m) => [m.sender.email, m.sender])
+                        ).values()
+                    )
 
-                    if (otherSenders.length > 0) {
-                        const lastOther = otherSenders[otherSenders.length - 1]
-                        avatarName = lastOther.sender.name
-                    } else {
-                        if (
-                            currentUser &&
-                            currentUser.email === email.sender.email
-                        ) {
-                            avatarUrl = currentUser.picture
-                        }
-                    }
+                    const sendersToShow =
+                        uniqueParticipants.length > 0
+                            ? uniqueParticipants
+                            : [email.sender]
+
+                    const visibleSenders = sendersToShow.slice(0, 3)
 
                     return (
                         <div
@@ -116,18 +114,33 @@ export function EmailList({
                                     'bg-[#00712D]/5 dark:bg-[#00712D]/20'
                             )}
                         >
-                            <div className="mt-1 flex-shrink-0">
-                                {avatarUrl ? (
-                                    <img
-                                        src={avatarUrl}
-                                        alt={avatarName}
-                                        className="h-8 w-8 rounded-full object-cover"
-                                    />
-                                ) : (
-                                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#00712D]/60 to-[#00712D] text-xs font-medium text-white">
-                                        {avatarName[0]}
+                            <div className="mt-1 flex flex-shrink-0 -space-x-2">
+                                {visibleSenders.map((sender, i) => (
+                                    <div
+                                        key={sender.email}
+                                        className="relative z-30 hover:z-40"
+                                        style={{ zIndex: 30 - i }}
+                                    >
+                                        {(() => {
+                                            const avatarUrl =
+                                                sender.email ===
+                                                currentUser?.email
+                                                    ? currentUser?.picture
+                                                    : sender.avatar
+                                            return avatarUrl ? (
+                                                <img
+                                                    src={avatarUrl}
+                                                    alt={sender.name}
+                                                    className="h-8 w-8 rounded-full object-cover ring-2 ring-white dark:ring-[#191919]"
+                                                />
+                                            ) : (
+                                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#00712D]/60 to-[#00712D] text-xs font-medium text-white ring-2 ring-white dark:ring-[#191919]">
+                                                    {sender.name[0]}
+                                                </div>
+                                            )
+                                        })()}
                                     </div>
-                                )}
+                                ))}
                             </div>
                             <div className="min-w-0 flex-1">
                                 <div className="mb-1 flex items-baseline justify-between">

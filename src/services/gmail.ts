@@ -250,6 +250,20 @@ export async function fetchAttachmentData(
     }
 }
 
+const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.readAsDataURL(file)
+        reader.onload = () => {
+            const result = reader.result as string
+            // Remove data URL prefix (e.g., "data:image/png;base64,")
+            const base64 = result.split(',')[1]
+            resolve(base64)
+        }
+        reader.onerror = (error) => reject(error)
+    })
+}
+
 export async function sendEmailMessage(
     accessToken: string,
     to: string,
@@ -257,26 +271,56 @@ export async function sendEmailMessage(
     body: string,
     threadId?: string,
     inReplyTo?: string,
-    references?: string
+    references?: string,
+    attachments: File[] = []
 ) {
+    const boundary = `boundary_${Date.now().toString(16)}`
     const messageParts = [
         `To: ${to}`,
-        'Content-Type: text/html; charset=utf-8',
-        'MIME-Version: 1.0',
         `Subject: ${subject}`,
+        'MIME-Version: 1.0',
+        `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    ]
+
+    if (inReplyTo) {
+        messageParts.splice(3, 0, `In-Reply-To: ${inReplyTo}`)
+    }
+    if (references) {
+        messageParts.splice(3, 0, `References: ${references}`)
+    }
+
+    // Body part
+    const bodyParts = [
+        `--${boundary}`,
+        'Content-Type: text/html; charset=utf-8',
         '',
         body,
     ]
 
-    if (inReplyTo) {
-        messageParts.splice(4, 0, `In-Reply-To: ${inReplyTo}`)
-    }
-    if (references) {
-        messageParts.splice(4, 0, `References: ${references}`)
-    }
+    // Attachment parts
+    const attachmentParts = await Promise.all(
+        attachments.map(async (file) => {
+            const base64Content = await fileToBase64(file)
+            return [
+                `--${boundary}`,
+                `Content-Type: ${file.type}; name="${file.name}"`,
+                'Content-Transfer-Encoding: base64',
+                `Content-Disposition: attachment; filename="${file.name}"`,
+                '',
+                base64Content,
+            ].join('\r\n')
+        })
+    )
 
-    const message = messageParts.join('\r\n')
-    const encodedMessage = btoa(unescape(encodeURIComponent(message)))
+    const fullMessage = [
+        ...messageParts,
+        '',
+        ...bodyParts,
+        ...attachmentParts,
+        `--${boundary}--`,
+    ].join('\r\n')
+
+    const encodedMessage = btoa(unescape(encodeURIComponent(fullMessage)))
         .replace(/\+/g, '-')
         .replace(/\//g, '_')
         .replace(/=+$/, '')
@@ -298,23 +342,5 @@ export async function sendEmailMessage(
 
     if (!response.ok) {
         throw new Error('Failed to send email')
-    }
-}
-
-export async function fetchUnreadCount(
-    accessToken: string,
-    query: string
-): Promise<number> {
-    try {
-        const response = await fetch(
-            `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(`(${query}) label:UNREAD`)}&includeSpamTrash=true&maxResults=1`,
-            { headers: { Authorization: `Bearer ${accessToken}` } }
-        )
-        if (!response.ok) return 0
-        const data = await response.json()
-        return data.resultSizeEstimate || 0
-    } catch (error) {
-        console.error('Error fetching unread count:', error)
-        return 0
     }
 }
