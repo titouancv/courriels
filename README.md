@@ -1,4 +1,4 @@
-# courriels
+# corriels
 
 A minimalist, Notion-style Gmail client focused on clarity and efficiency.
 

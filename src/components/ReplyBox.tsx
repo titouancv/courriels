@@ -11,6 +11,7 @@ export function ReplyBox({ onSend, isSending }: ReplyBoxProps) {
     const [body, setBody] = useState('')
     const [attachments, setAttachments] = useState<File[]>([])
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const textareaRef = useRef<HTMLTextAreaElement>(null)
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
@@ -32,8 +33,21 @@ export function ReplyBox({ onSend, isSending }: ReplyBoxProps) {
             await onSend(body, attachments)
             setBody('')
             setAttachments([])
+            if (textareaRef.current) {
+                textareaRef.current.style.height = 'auto'
+            }
         } catch (error) {
-            console.error('Failed to send reply:', error)
+            // Error handled by parent
+        }
+    }
+
+    const handleTextareaChange = (
+        e: React.ChangeEvent<HTMLTextAreaElement>
+    ) => {
+        setBody(e.target.value)
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto'
+            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
         }
     }
 
@@ -64,46 +78,54 @@ export function ReplyBox({ onSend, isSending }: ReplyBoxProps) {
             )}
 
             <div className="flex items-end gap-2">
-                <div className="relative flex-1">
+                <div className="flex-1">
                     <textarea
+                        ref={textareaRef}
                         value={body}
-                        onChange={(e) => setBody(e.target.value)}
+                        onChange={handleTextareaChange}
                         placeholder="Type a message..."
-                        className="min-h-[80px] w-full resize-none rounded-lg border border-[#E9E9E7] bg-white p-3 text-[#37352F] placeholder-[#9B9A97] focus:ring-2 focus:ring-[#00712D]/20 focus:outline-none dark:border-[#2F2F2F] dark:bg-[#202020] dark:text-[#D4D4D4]"
+                        className="max-h-[250px] min-h-[80px] w-full resize-none rounded-lg border border-[#E9E9E7] bg-white p-3 text-[#37352F] placeholder-[#9B9A97] focus:ring-2 focus:ring-[#00712D]/20 focus:outline-none dark:border-[#2F2F2F] dark:bg-[#202020] dark:text-[#D4D4D4]"
                         onKeyDown={(e) => {
                             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                                 handleSend()
                             }
                         }}
                     />
-                    <div className="absolute right-2 bottom-2">
-                        <input
-                            type="file"
-                            multiple
-                            className="hidden"
-                            ref={fileInputRef}
-                            onChange={handleFileSelect}
-                        />
+                    <div className="flex w-full justify-between">
+                        <div className="flex items-center gap-2">
+                            <div>
+                                <input
+                                    type="file"
+                                    multiple
+                                    className="hidden"
+                                    ref={fileInputRef}
+                                    onChange={handleFileSelect}
+                                />
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() =>
+                                        fileInputRef.current?.click()
+                                    }
+                                    icon={Paperclip}
+                                    title="Attach files"
+                                    className="h-8 w-8 text-[#787774] hover:text-[#37352F] dark:text-[#9B9A97] dark:hover:text-[#D4D4D4]"
+                                />
+                            </div>
+                        </div>
                         <Button
-                            variant="ghost"
+                            onClick={handleSend}
+                            disabled={
+                                (!body.trim() && attachments.length === 0) ||
+                                isSending
+                            }
+                            variant="primary"
                             size="icon"
-                            onClick={() => fileInputRef.current?.click()}
-                            icon={Paperclip}
-                            title="Attach files"
-                            className="h-8 w-8 text-[#787774] hover:text-[#37352F] dark:text-[#9B9A97] dark:hover:text-[#D4D4D4]"
+                            icon={Send}
+                            className=""
                         />
                     </div>
                 </div>
-                <Button
-                    onClick={handleSend}
-                    disabled={
-                        (!body.trim() && attachments.length === 0) || isSending
-                    }
-                    variant="primary"
-                    size="icon"
-                    icon={Send}
-                    className="mb-1"
-                />
             </div>
         </div>
     )

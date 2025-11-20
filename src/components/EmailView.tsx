@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import type { Email } from '../types'
-import { X } from 'lucide-react'
+import { X, ArrowLeft } from 'lucide-react'
 import { clsx } from 'clsx'
 import { Button } from '../design-system/Button'
 import { formatEmailDate } from '../utils/date'
@@ -8,11 +8,20 @@ import { MessageContent } from './MessageContent'
 import { AttachmentItem } from './AttachmentItem'
 import { ReplyBox } from './ReplyBox'
 
-import { FileCode, MoreHorizontal } from 'lucide-react'
+import {
+    FileCode,
+    MoreHorizontal,
+    Forward,
+    Trash2,
+    MailOpen,
+} from 'lucide-react'
 
 interface EmailViewProps {
     email: Email | null
     onSendReply: (body: string, attachments: File[]) => Promise<void>
+    onForward: (subject: string, body: string) => void
+    onDelete?: (emailId: string, threadId: string) => void
+    onMarkAsRead?: (emailId: string, threadId: string) => void
     currentUserEmail?: string
     onFetchAttachment: (
         messageId: string,
@@ -24,6 +33,9 @@ interface EmailViewProps {
 export function EmailView({
     email,
     onSendReply,
+    onForward,
+    onDelete,
+    onMarkAsRead,
     currentUserEmail,
     onFetchAttachment,
     onClose,
@@ -60,18 +72,25 @@ export function EmailView({
         new Set(
             email.messages
                 .filter((m) => m.sender.email !== currentUserEmail)
-                .map((m) => m.sender.name)
+                .map((m) => m.sender.email)
         )
     )
 
     const displayNames =
-        uniqueNames.length > 0 ? uniqueNames.join(', ') : email.sender.name
+        uniqueNames.length > 0 ? uniqueNames.join(', ') : email.sender.email
 
     return (
         <div className="flex h-full flex-1 flex-col overflow-y-auto border-l border-[#E9E9E7] bg-white dark:border-[#2F2F2F] dark:bg-[#191919]">
             <div className="sticky top-0 z-10 border-b border-[#E9E9E7] bg-white p-4 dark:border-[#2F2F2F] dark:bg-[#191919]">
-                <div className="flex items-start justify-between">
-                    <div className="min-w-0 flex-1 pr-4">
+                <div className="flex items-start justify-between gap-4">
+                    <Button
+                        variant="icon"
+                        size="icon"
+                        onClick={onClose}
+                        className="md:hidden"
+                        icon={ArrowLeft}
+                    />
+                    <div className="min-w-0 flex-1">
                         <h1
                             className="truncate text-xl font-semibold text-[#37352F] dark:text-[#D4D4D4]"
                             title={email.subject}
@@ -83,6 +102,29 @@ export function EmailView({
                         </div>
                     </div>
                     <div className="flex flex-shrink-0 items-center gap-2 text-[#787774] dark:text-[#9B9A97]">
+                        {onMarkAsRead && !email.read && (
+                            <Button
+                                variant="icon"
+                                size="icon"
+                                onClick={() =>
+                                    onMarkAsRead(email.id, email.threadId)
+                                }
+                                title="Mark as read"
+                                icon={MailOpen}
+                            />
+                        )}
+                        {onDelete && (
+                            <Button
+                                variant="icon"
+                                size="icon"
+                                onClick={() => {
+                                    onDelete(email.id, email.threadId)
+                                    onClose()
+                                }}
+                                title="Delete"
+                                icon={Trash2}
+                            />
+                        )}
                         <Button
                             variant="icon"
                             size="icon"
@@ -220,6 +262,21 @@ export function EmailView({
                                                             : 'left-0'
                                                     )}
                                                 >
+                                                    <button
+                                                        onClick={() => {
+                                                            onForward(
+                                                                `Fwd: ${email.subject}`,
+                                                                `\n\n---------- Forwarded message ---------\nFrom: ${message.sender.name} <${message.sender.email}>\nDate: ${formatEmailDate(message.date, { includeTime: true })}\nSubject: ${email.subject}\nTo: ${currentUserEmail}\n\n${message.content}`
+                                                            )
+                                                            setActiveMenuMessageId(
+                                                                null
+                                                            )
+                                                        }}
+                                                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-[#37352F] hover:bg-[#F7F7F5] dark:text-[#D4D4D4] dark:hover:bg-[#202020]"
+                                                    >
+                                                        <Forward className="h-4 w-4" />
+                                                        Forward
+                                                    </button>
                                                     <button
                                                         onClick={() => {
                                                             setShowOriginal(

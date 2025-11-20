@@ -1,49 +1,68 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
+import { Toaster, toast } from 'sonner'
 import { Sidebar } from './components/Sidebar'
 import { EmailList } from './components/EmailList'
 import { EmailView } from './components/EmailView'
-import { ComposeModal } from './components/ComposeModal'
+import { ComposeView } from './components/ComposeView'
 import { SearchInput } from './design-system/SearchInput'
 import { LoginPage } from './components/LoginPage'
 import { SettingsView } from './components/SettingsView'
 import { Button } from './design-system/Button'
-import { Plus } from 'lucide-react'
-import type { FolderId, User, Email } from './types'
-import { supabase, saveUserToSupabase, getUserProfile } from './lib/supabase'
-import {
-    fetchThreadsList,
-    fetchThreadDetails,
-    fetchUserInfo as fetchUserInfoService,
-    sendEmailMessage,
-    fetchAttachmentData,
-} from './services/gmail'
+import { Plus, Menu } from 'lucide-react'
+import { clsx } from 'clsx'
+import type { FolderId, Email } from './types'
+import { sendEmailMessage, fetchAttachmentData } from './services/gmailApi'
+import { useAuth } from './hooks/useAuth'
+import { useEmails } from './hooks/useEmails'
 
 function App() {
-    const [currentFolder, setCurrentFolder] =
-        useState<FolderId>('conversations')
-    const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null)
-    const [user, setUser] = useState<User | null>(null)
-    const [accessToken, setAccessToken] = useState<string | null>(null)
-    const [conversationEmails, setConversationEmails] = useState<Email[]>([])
-    const [notificationEmails, setNotificationEmails] = useState<Email[]>([])
-    const [trashEmails, setTrashEmails] = useState<Email[]>([])
-    const [isComposeOpen, setIsComposeOpen] = useState(false)
+    const { user, accessToken, logout, setUser } = useAuth()
+    const {
+        conversationEmails,
+        notificationEmails,
+        trashEmails,
+        isRefreshing,
+        isLoading,
+        nextPageToken,
+        refreshEmails,
+        unreadCounts,
+        deleteEmail,
+        markAsRead,
+    } = useEmails(accessToken)
+
+    const [currentFolder, setCurrentFolder] = useState<FolderId>(() => {
+        if (typeof window === 'undefined') return 'conversations'
+        const params = new URLSearchParams(window.location.search)
+        const folder = params.get('folder') as FolderId
+        return folder &&
+            ['conversations', 'notifications', 'trash'].includes(folder)
+            ? folder
+            : 'conversations'
+    })
+    const [selectedEmailId, setSelectedEmailId] = useState<string | null>(
+        () => {
+            if (typeof window === 'undefined') return null
+            const params = new URLSearchParams(window.location.search)
+            return params.get('emailId') || null
+        }
+    )
+    const [searchQuery, setSearchQuery] = useState('')
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+    const [isComposeOpen, setIsComposeOpen] = useState(() => {
+        if (typeof window === 'undefined') return false
+        const params = new URLSearchParams(window.location.search)
+        return params.get('compose') === 'true'
+    })
     const [composeInitialTo, setComposeInitialTo] = useState('')
     const [composeInitialSubject, setComposeInitialSubject] = useState('')
-    const [composeThreadId, setComposeThreadId] = useState<string | undefined>(
-        undefined
-    )
-    const [composeInReplyTo, setComposeInReplyTo] = useState<
-        string | undefined
-    >(undefined)
-    const [composeReferences, setComposeReferences] = useState<
-        string | undefined
-    >(undefined)
-    const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-    const [isRefreshing, setIsRefreshing] = useState(false)
-    const [nextPageToken, setNextPageToken] = useState<string | null>(null)
-    const [searchQuery, setSearchQuery] = useState('')
+    const [composeInitialBody, setComposeInitialBody] = useState('')
+    const [isSettingsOpen, setIsSettingsOpen] = useState(() => {
+        if (typeof window === 'undefined') return false
+        const params = new URLSearchParams(window.location.search)
+        return params.get('settings') === 'true'
+    })
+
     const [darkMode, setDarkMode] = useState(() => {
         if (typeof window !== 'undefined') {
             return (
@@ -54,12 +73,6 @@ function App() {
         }
         return false
     })
-    const [unreadCounts, setUnreadCounts] = useState<Record<FolderId, number>>({
-        conversations: 0,
-        notifications: 0,
-        trash: 0,
-    })
-    const fetchIdRef = useRef(0)
 
     useEffect(() => {
         if (darkMode) {
@@ -71,211 +84,69 @@ function App() {
         }
     }, [darkMode])
 
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (accessToken) {
+                refreshEmails(
+                    currentFolder,
+                    undefined,
+                    searchQuery || undefined
+                )
+            }
+        }, 500)
+
+        return () => clearTimeout(timer)
+    }, [searchQuery, currentFolder, accessToken, refreshEmails])
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return
+        if (!accessToken) return
+
+        const params = new URLSearchParams()
+        if (currentFolder !== 'conversations')
+            params.set('folder', currentFolder)
+        if (selectedEmailId) params.set('emailId', selectedEmailId)
+        if (isComposeOpen) params.set('compose', 'true')
+        if (isSettingsOpen) params.set('settings', 'true')
+
+        const queryString = params.toString()
+        const newUrl = queryString
+            ? `${window.location.pathname}?${queryString}`
+            : window.location.pathname
+
+        window.history.replaceState({}, '', newUrl)
+    }, [
+        currentFolder,
+        selectedEmailId,
+        isComposeOpen,
+        isSettingsOpen,
+        accessToken,
+    ])
+
     const filteredEmails = (() => {
         let emails: Email[] = []
         if (currentFolder === 'conversations') emails = conversationEmails
         else if (currentFolder === 'notifications') emails = notificationEmails
         else if (currentFolder === 'trash') emails = trashEmails
-
-        return emails.filter((email) => {
-            if (searchQuery) return true
-            if (currentFolder === 'notifications')
-                return email.messages.length === 1 && email.folder === 'inbox'
-            if (currentFolder === 'conversations')
-                return (
-                    (email.messages.length > 1 || email.folder === 'sent') &&
-                    email.folder !== 'trash'
-                )
-            return email.folder === 'trash'
-        })
+        return emails
     })()
 
     const selectedEmail =
-        filteredEmails.find((email) => email.id === selectedEmailId) || null
+        conversationEmails.find((e) => e.id === selectedEmailId) ||
+        notificationEmails.find((e) => e.id === selectedEmailId) ||
+        trashEmails.find((e) => e.id === selectedEmailId) ||
+        null
 
-    useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            if (session?.provider_token) {
-                setAccessToken(session.provider_token)
-            }
-        })
-
-        const {
-            data: { subscription },
-        } = supabase.auth.onAuthStateChange((_event, session) => {
-            if (session?.provider_token) {
-                setAccessToken(session.provider_token)
-            } else {
-                setAccessToken(null)
-                setUser(null)
-                setConversationEmails([])
-                setNotificationEmails([])
-                setTrashEmails([])
-            }
-        })
-
-        return () => subscription.unsubscribe()
-    }, [])
-
-    const handleLogout = async () => {
-        await supabase.auth.signOut()
-        setAccessToken(null)
-        setUser(null)
-        setConversationEmails([])
-        setNotificationEmails([])
-        setTrashEmails([])
+    if (!isLoading && !isRefreshing && selectedEmailId && !selectedEmail) {
+        setSelectedEmailId(null)
     }
-
-    const refreshEmails = async (
-        pageToken?: string,
-        queryOverride?: string,
-        targetFolder?: FolderId
-    ) => {
-        if (!accessToken) return
-
-        const folderToFetch = targetFolder || currentFolder
-        const currentFetchId = ++fetchIdRef.current
-        setIsRefreshing(true)
-        try {
-            let query = ''
-            const activeSearch =
-                queryOverride !== undefined ? queryOverride : searchQuery
-
-            if (activeSearch) {
-                query = activeSearch
-            } else {
-                switch (folderToFetch) {
-                    case 'notifications':
-                        query = ''
-                        break
-                    case 'conversations':
-                        query = 'from:me'
-                        break
-                    case 'trash':
-                        query = 'in:trash'
-                        break
-                }
-            }
-
-            const listData = await fetchThreadsList(
-                accessToken,
-                query,
-                pageToken
-            )
-
-            if (currentFetchId !== fetchIdRef.current && !targetFolder) return
-
-            if (!targetFolder) {
-                setNextPageToken(listData.nextPageToken || null)
-            }
-
-            const setEmails = (update: (prev: Email[]) => Email[]) => {
-                if (folderToFetch === 'conversations')
-                    setConversationEmails(update)
-                else if (folderToFetch === 'notifications')
-                    setNotificationEmails(update)
-                else if (folderToFetch === 'trash') setTrashEmails(update)
-            }
-
-            if (!listData.threads) {
-                if (!pageToken) setEmails(() => [])
-                return
-            }
-
-            // Fetch details for each thread
-            const emailPromises = listData.threads.map(
-                (thread: { id: string }) =>
-                    fetchThreadDetails(accessToken, thread.id)
-            )
-            const fetchedEmails = await Promise.all(emailPromises)
-
-            if (currentFetchId !== fetchIdRef.current && !targetFolder) return
-
-            if (pageToken) {
-                setEmails((prev) => [...prev, ...fetchedEmails])
-            } else {
-                setEmails(() => fetchedEmails)
-            }
-        } catch (error) {
-            console.error('Failed to fetch data:', error)
-            // If token is invalid, clear it
-            if (
-                (error as any).status === 401 ||
-                (error as any).message?.includes('401')
-            ) {
-                localStorage.removeItem('gmail_token')
-                setAccessToken(null)
-                setUser(null)
-            }
-        } finally {
-            if (currentFetchId === fetchIdRef.current) {
-                setIsRefreshing(false)
-            }
-        }
-    }
-
-    useEffect(() => {
-        if (!accessToken) return
-
-        const fetchUserInfo = async () => {
-            try {
-                const {
-                    data: { session },
-                } = await supabase.auth.getSession()
-
-                if (session?.user?.id) {
-                    const profile = await getUserProfile(session.user.id)
-
-                    if (profile) {
-                        setUser({
-                            email: profile.email,
-                            name: profile.full_name,
-                            picture: profile.avatar_url,
-                        })
-                    } else {
-                        const userData = await fetchUserInfoService(accessToken)
-                        setUser(userData)
-                        await saveUserToSupabase(userData, session.user.id)
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to fetch user info:', error)
-            }
-        }
-
-        fetchUserInfo()
-
-        // Initial fetch for all folders
-        refreshEmails(undefined, undefined, 'conversations')
-        refreshEmails(undefined, undefined, 'notifications')
-        refreshEmails(undefined, undefined, 'trash')
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [accessToken])
-
-    useEffect(() => {
-        setUnreadCounts({
-            conversations: conversationEmails.filter(
-                (email) =>
-                    (email.messages.length > 1 || email.folder === 'sent') &&
-                    email.folder !== 'trash' &&
-                    !email.read
-            ).length,
-            notifications: notificationEmails.filter(
-                (email) =>
-                    email.messages.length === 1 &&
-                    email.folder === 'inbox' &&
-                    !email.read
-            ).length,
-            trash: trashEmails.filter(
-                (email) => email.folder === 'trash' && !email.read
-            ).length,
-        })
-    }, [conversationEmails, notificationEmails, trashEmails])
 
     const handleSendEmail = async (
         to: string,
         subject: string,
         body: string,
+        cc?: string,
+        bcc?: string,
         replyContext?: {
             threadId?: string
             inReplyTo?: string
@@ -285,23 +156,24 @@ function App() {
     ) => {
         if (!accessToken) return
 
-        const inReplyTo = replyContext?.inReplyTo || composeInReplyTo
-        const references = replyContext?.references || composeReferences
-        const threadId = replyContext?.threadId || composeThreadId
-
         try {
             await sendEmailMessage(
                 accessToken,
                 to,
                 subject,
                 body,
-                threadId,
-                inReplyTo,
-                references,
+                cc,
+                bcc,
+                replyContext?.threadId,
+                replyContext?.inReplyTo,
+                replyContext?.references,
                 attachments
             )
+            toast.success('Email sent successfully')
+            refreshEmails(currentFolder)
         } catch (error) {
             console.error('Error sending email:', error)
+            toast.error('Failed to send email')
             throw error
         }
     }
@@ -324,17 +196,30 @@ function App() {
                 : lastMessage.messageIdHeader,
         }
 
-        await handleSendEmail(to, subject, body, replyContext, attachments)
-        refreshEmails()
+        await handleSendEmail(
+            to,
+            subject,
+            body,
+            undefined,
+            undefined,
+            replyContext,
+            attachments
+        )
+    }
+
+    const handleForward = (subject: string, body: string) => {
+        setComposeInitialTo('')
+        setComposeInitialSubject(subject)
+        setComposeInitialBody(body)
+        setIsComposeOpen(true)
     }
 
     const handleComposeOpen = () => {
         setComposeInitialTo('')
         setComposeInitialSubject('')
-        setComposeThreadId(undefined)
-        setComposeInReplyTo(undefined)
-        setComposeReferences(undefined)
+        setComposeInitialBody('')
         setIsComposeOpen(true)
+        setSelectedEmailId(null)
     }
 
     const fetchAttachment = async (messageId: string, attachmentId: string) => {
@@ -342,10 +227,16 @@ function App() {
         return fetchAttachmentData(accessToken, messageId, attachmentId)
     }
 
+    const loadMore = () => {
+        if (nextPageToken) {
+            refreshEmails(currentFolder, nextPageToken, searchQuery)
+        }
+    }
+
+    const hasMore = !!nextPageToken
+
     const handleSearch = (query: string) => {
         setSearchQuery(query)
-        setNextPageToken(null)
-        refreshEmails(undefined, query)
     }
 
     if (!accessToken) {
@@ -354,82 +245,156 @@ function App() {
 
     return (
         <div className="flex h-screen bg-white font-sans antialiased transition-colors duration-200 dark:bg-[#191919]">
-            <Sidebar
-                currentFolder={currentFolder}
-                onFolderChange={(folder) => {
-                    setCurrentFolder(folder)
-                    setSearchQuery('')
-                    setIsSettingsOpen(false)
-                }}
-                user={user}
-                onOpenSettings={() => {
-                    setIsSettingsOpen(true)
-                    setSelectedEmailId(null)
-                }}
-                unreadCounts={unreadCounts}
-            />
+            <Toaster position="bottom-right" />
+
+            {/* Mobile Sidebar Overlay */}
+            {isMobileMenuOpen && (
+                <div
+                    className="fixed inset-0 z-40 bg-black/50 md:hidden"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                />
+            )}
+
+            {/* Sidebar */}
+            <div
+                className={clsx(
+                    'fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0',
+                    isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+                )}
+            >
+                <Sidebar
+                    currentFolder={currentFolder}
+                    onFolderChange={(folder) => {
+                        setCurrentFolder(folder)
+                        setIsSettingsOpen(false)
+                        setIsMobileMenuOpen(false)
+                    }}
+                    user={user}
+                    onOpenSettings={() => {
+                        setIsSettingsOpen(true)
+                        setSelectedEmailId(null)
+                        setIsMobileMenuOpen(false)
+                    }}
+                    unreadCounts={unreadCounts}
+                />
+            </div>
 
             <div className="flex min-w-0 flex-1 flex-col">
                 {!isSettingsOpen && (
-                    <div className="flex h-16 items-center justify-between border-b border-[#E9E9E7] bg-white px-6 dark:border-[#2F2F2F] dark:bg-[#191919]">
-                        <div className="w-96">
+                    <div className="flex h-16 items-center justify-between gap-4 border-b border-[#E9E9E7] bg-white px-4 md:px-6 dark:border-[#2F2F2F] dark:bg-[#191919]">
+                        <Button
+                            variant="icon"
+                            className="md:hidden"
+                            onClick={() => setIsMobileMenuOpen(true)}
+                            icon={Menu}
+                        />
+                        <div className="flex-1 md:w-96 md:flex-none">
                             <SearchInput
                                 value={searchQuery}
                                 onChange={handleSearch}
-                                placeholder="Search emails..."
+                                placeholder="Search..."
                             />
                         </div>
-                        <Button onClick={handleComposeOpen} icon={Plus}>
-                            New Message
+                        <Button
+                            onClick={handleComposeOpen}
+                            icon={Plus}
+                            className="shrink-0"
+                        >
+                            <span className="hidden md:inline">
+                                New Message
+                            </span>
+                            <span className="md:hidden">New</span>
                         </Button>
                     </div>
                 )}
 
-                <div className="flex min-h-0 flex-1">
+                <div className="relative flex min-h-0 flex-1">
                     {isSettingsOpen && user ? (
                         <SettingsView
                             user={user}
                             onUpdateUser={setUser}
-                            onLogout={handleLogout}
+                            onLogout={logout}
                             darkMode={darkMode}
                             toggleDarkMode={() => setDarkMode(!darkMode)}
+                            onClose={() => setIsSettingsOpen(false)}
                         />
                     ) : (
                         <>
                             <EmailList
                                 emails={filteredEmails}
-                                selectedEmailId={selectedEmailId}
-                                onSelectEmail={setSelectedEmailId}
-                                onRefresh={() => refreshEmails()}
-                                isRefreshing={isRefreshing}
-                                onLoadMore={() =>
-                                    nextPageToken &&
-                                    refreshEmails(nextPageToken)
+                                selectedEmailId={
+                                    selectedEmail ? selectedEmailId : null
                                 }
-                                hasMore={!!nextPageToken}
+                                onSelectEmail={(id) => {
+                                    setSelectedEmailId(id)
+                                    setIsComposeOpen(false)
+                                }}
+                                onRefresh={() =>
+                                    refreshEmails(
+                                        currentFolder,
+                                        undefined,
+                                        searchQuery
+                                    )
+                                }
+                                isRefreshing={isRefreshing}
+                                onLoadMore={loadMore}
+                                hasMore={hasMore}
                                 currentUser={user}
                                 searchQuery={searchQuery}
                                 currentFolder={currentFolder}
+                                className={clsx(
+                                    (isComposeOpen ||
+                                        (selectedEmailId && selectedEmail)) &&
+                                        'hidden md:flex'
+                                )}
                             />
-                            <EmailView
-                                email={selectedEmail}
-                                onSendReply={handleInlineReply}
-                                currentUserEmail={user?.email}
-                                onFetchAttachment={fetchAttachment}
-                                onClose={() => setSelectedEmailId(null)}
-                            />
+                            {(isComposeOpen ||
+                                (selectedEmailId && selectedEmail)) && (
+                                <div className="absolute inset-0 z-10 flex flex-col bg-white md:static md:min-w-0 md:flex-1 dark:bg-[#191919]">
+                                    {isComposeOpen ? (
+                                        <ComposeView
+                                            onClose={() =>
+                                                setIsComposeOpen(false)
+                                            }
+                                            onSend={handleSendEmail}
+                                            initialTo={composeInitialTo}
+                                            initialSubject={
+                                                composeInitialSubject
+                                            }
+                                            initialBody={composeInitialBody}
+                                        />
+                                    ) : (
+                                        <EmailView
+                                            email={selectedEmail}
+                                            onSendReply={handleInlineReply}
+                                            onForward={handleForward}
+                                            onDelete={(emailId, threadId) =>
+                                                deleteEmail(
+                                                    emailId,
+                                                    threadId,
+                                                    currentFolder
+                                                )
+                                            }
+                                            onMarkAsRead={(emailId, threadId) =>
+                                                markAsRead(
+                                                    emailId,
+                                                    threadId,
+                                                    currentFolder
+                                                )
+                                            }
+                                            currentUserEmail={user?.email}
+                                            onFetchAttachment={fetchAttachment}
+                                            onClose={() =>
+                                                setSelectedEmailId(null)
+                                            }
+                                        />
+                                    )}
+                                </div>
+                            )}
                         </>
                     )}
                 </div>
             </div>
-
-            <ComposeModal
-                isOpen={isComposeOpen}
-                onClose={() => setIsComposeOpen(false)}
-                onSend={handleSendEmail}
-                initialTo={composeInitialTo}
-                initialSubject={composeInitialSubject}
-            />
         </div>
     )
 }

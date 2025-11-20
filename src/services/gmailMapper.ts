@@ -1,4 +1,5 @@
-import type { Attachment, Email, User } from '../types'
+import DOMPurify from 'dompurify'
+import type { Attachment, Email } from '../types'
 
 export function decodeEmailBody(data: string) {
     const base64 = data.replace(/-/g, '+').replace(/_/g, '/')
@@ -67,8 +68,22 @@ export function getAttachments(payload: any): Attachment[] {
 
 export function cleanEmailContent(html: string) {
     try {
+        // First sanitize the HTML to prevent XSS
+        const sanitized = DOMPurify.sanitize(html, {
+            USE_PROFILES: { html: true },
+            FORBID_TAGS: [
+                'script',
+                'style',
+                'iframe',
+                'object',
+                'embed',
+                'form',
+            ],
+            FORBID_ATTR: ['onmouseover', 'onclick', 'onerror'],
+        })
+
         const parser = new DOMParser()
-        const doc = parser.parseFromString(html, 'text/html')
+        const doc = parser.parseFromString(sanitized, 'text/html')
 
         // Remove Gmail extra quotes
         const gmailQuotes = doc.querySelectorAll('.gmail_quote')
@@ -85,57 +100,12 @@ export function cleanEmailContent(html: string) {
         return doc.body.innerHTML
     } catch (e) {
         console.error('Error cleaning email content:', e)
-        return html
+        return DOMPurify.sanitize(html) // Fallback to just sanitizing
     }
 }
 
-export async function fetchUserInfo(accessToken: string): Promise<User> {
-    const userResponse = await fetch(
-        'https://www.googleapis.com/oauth2/v3/userinfo',
-        {
-            headers: { Authorization: `Bearer ${accessToken}` },
-        }
-    )
-
-    if (!userResponse.ok) {
-        throw new Error('Failed to fetch user info')
-    }
-
-    const userData = await userResponse.json()
-    return {
-        email: userData.email,
-        name: userData.name,
-        picture: userData.picture,
-    }
-}
-
-export async function fetchThreadsList(
-    accessToken: string,
-    query: string,
-    pageToken?: string
-) {
-    let url = `https://gmail.googleapis.com/gmail/v1/users/me/threads?maxResults=50&q=${encodeURIComponent(query)}`
-    if (pageToken) {
-        url += `&pageToken=${pageToken}`
-    }
-
-    const listResponse = await fetch(url, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-    })
-    if (!listResponse.ok) throw new Error('Failed to fetch threads list')
-    return await listResponse.json()
-}
-
-export async function fetchThreadDetails(
-    accessToken: string,
-    threadId: string
-): Promise<Email> {
-    const threadResponse = await fetch(
-        `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-    )
-    const threadData = await threadResponse.json()
-
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function mapThreadToEmail(threadData: any): Email {
     // Process messages in the thread
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const messages = threadData.messages.map((msgData: any) => {
@@ -227,120 +197,5 @@ export async function fetchThreadDetails(
                 ].includes(l)
         ),
         folder: folder,
-    } as Email
-}
-
-export async function fetchAttachmentData(
-    accessToken: string,
-    messageId: string,
-    attachmentId: string
-): Promise<string | null> {
-    try {
-        const response = await fetch(
-            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/attachments/${attachmentId}`,
-            {
-                headers: { Authorization: `Bearer ${accessToken}` },
-            }
-        )
-        const data = await response.json()
-        return data.data.replace(/-/g, '+').replace(/_/g, '/')
-    } catch (error) {
-        console.error('Failed to fetch attachment:', error)
-        return null
-    }
-}
-
-const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.readAsDataURL(file)
-        reader.onload = () => {
-            const result = reader.result as string
-            // Remove data URL prefix (e.g., "data:image/png;base64,")
-            const base64 = result.split(',')[1]
-            resolve(base64)
-        }
-        reader.onerror = (error) => reject(error)
-    })
-}
-
-export async function sendEmailMessage(
-    accessToken: string,
-    to: string,
-    subject: string,
-    body: string,
-    cc?: string,
-    bcc?: string,
-    threadId?: string,
-    inReplyTo?: string,
-    references?: string,
-    attachments: File[] = []
-) {
-    const boundary = `boundary_${Date.now().toString(16)}`
-    const headers = [`To: ${to}`, `Subject: ${subject}`]
-
-    if (cc) headers.push(`Cc: ${cc}`)
-    if (bcc) headers.push(`Bcc: ${bcc}`)
-    if (inReplyTo) headers.push(`In-Reply-To: ${inReplyTo}`)
-    if (references) headers.push(`References: ${references}`)
-
-    headers.push('MIME-Version: 1.0')
-    headers.push(`Content-Type: multipart/mixed; boundary="${boundary}"`)
-
-    const messageParts = headers
-
-    // Body part
-    const bodyParts = [
-        `--${boundary}`,
-        'Content-Type: text/html; charset=utf-8',
-        '',
-        body,
-    ]
-
-    // Attachment parts
-    const attachmentParts = await Promise.all(
-        attachments.map(async (file) => {
-            const base64Content = await fileToBase64(file)
-            return [
-                `--${boundary}`,
-                `Content-Type: ${file.type}; name="${file.name}"`,
-                'Content-Transfer-Encoding: base64',
-                `Content-Disposition: attachment; filename="${file.name}"`,
-                '',
-                base64Content,
-            ].join('\r\n')
-        })
-    )
-
-    const fullMessage = [
-        ...messageParts,
-        '',
-        ...bodyParts,
-        ...attachmentParts,
-        `--${boundary}--`,
-    ].join('\r\n')
-
-    const encodedMessage = btoa(unescape(encodeURIComponent(fullMessage)))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '')
-
-    const response = await fetch(
-        'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
-        {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                raw: encodedMessage,
-                threadId: threadId,
-            }),
-        }
-    )
-
-    if (!response.ok) {
-        throw new Error('Failed to send email')
     }
 }

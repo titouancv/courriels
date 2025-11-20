@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Button } from '../design-system/Button'
 import { supabase } from '../lib/supabase'
 import type { User } from '../types'
-import { LogOut, Moon, Sun } from 'lucide-react'
+import { LogOut, Moon, Sun, X } from 'lucide-react'
 
 interface SettingsViewProps {
     user: User
@@ -10,6 +10,7 @@ interface SettingsViewProps {
     onLogout: () => void
     darkMode: boolean
     toggleDarkMode: () => void
+    onClose: () => void
 }
 
 export function SettingsView({
@@ -18,6 +19,7 @@ export function SettingsView({
     onLogout,
     darkMode,
     toggleDarkMode,
+    onClose,
 }: SettingsViewProps) {
     const [name, setName] = useState(user.name)
     const [isLoading, setIsLoading] = useState(false)
@@ -58,7 +60,15 @@ export function SettingsView({
     return (
         <div className="flex-1 overflow-y-auto bg-white p-8 dark:bg-[#191919] dark:text-[#D4D4D4]">
             <div className="mx-auto max-w-2xl">
-                <h2 className="mb-8 text-2xl font-semibold">Settings</h2>
+                <div className="mb-8 flex items-center justify-between">
+                    <h2 className="text-2xl font-semibold">Settings</h2>
+                    <Button
+                        variant="icon"
+                        onClick={onClose}
+                        icon={X}
+                        className="md:hidden"
+                    />
+                </div>
 
                 <div className="space-y-6">
                     <div>

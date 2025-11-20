@@ -49,7 +49,7 @@ export function Sidebar({
     return (
         <div className="flex h-screen w-64 flex-col border-r border-[#E9E9E7] bg-[#F7F7F5] text-[#37352F] transition-colors duration-200 dark:border-[#2F2F2F] dark:bg-[#202020] dark:text-[#D4D4D4]">
             <div className="p-4">
-                <div className="mb-6 text-lg font-semibold">courriels</div>
+                <div className="mb-6 text-lg font-semibold">corriels</div>
 
                 <div className="space-y-0.5">
                     {folders.map((folder) => (
