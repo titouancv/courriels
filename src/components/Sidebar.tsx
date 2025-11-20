@@ -42,9 +42,9 @@ export function Sidebar({
         },
     ]
 
-    // const isUnreadCount = (folderId: FolderId) => {
-    //     return (unreadCounts[folderId] ?? 0) > 0
-    // }
+    const isUnreadCount = (folderId: FolderId) => {
+        return (unreadCounts[folderId] ?? 0) > 0
+    }
 
     return (
         <div className="flex h-screen w-64 flex-col border-r border-[#E9E9E7] bg-[#F7F7F5] text-[#37352F] transition-colors duration-200 dark:border-[#2F2F2F] dark:bg-[#202020] dark:text-[#D4D4D4]">
@@ -60,16 +60,16 @@ export function Sidebar({
                             className={clsx(
                                 'w-full justify-start dark:text-[#D4D4D4] dark:hover:bg-[#2F2F2F]',
                                 currentFolder === folder.id &&
-                                    'bg-[#EFEFED] text-[#37352F] dark:bg-[#2F2F2F] dark:text-white'
+                                    'bg-[#EFEFED] text-black dark:bg-[#2F2F2F] dark:text-white'
                             )}
                             icon={folder.icon}
                         >
                             <span>{folder.label}</span>
-                            {/* {isUnreadCount(folder.id) && (
+                            {isUnreadCount(folder.id) && (
                                 <span className="ml-auto rounded-full bg-red-500 px-2 py-0.5 text-xs font-semibold text-white">
                                     {unreadCounts[folder.id]}
                                 </span>
-                            )} */}
+                            )}
                         </Button>
                     ))}
                 </div>

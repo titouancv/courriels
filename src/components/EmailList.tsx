@@ -50,10 +50,10 @@ export function EmailList({
                 selectedEmailId ? 'w-96' : 'flex-1'
             )}
         >
-            <div className="sticky top-0 z-10 space-y-4 border-b border-[#E9E9E7] bg-white p-4 dark:border-[#2F2F2F] dark:bg-[#191919]">
+            <div className="sticky top-0 z-40 space-y-4 border-b border-[#E9E9E7] bg-white p-4 dark:border-[#2F2F2F] dark:bg-[#191919]">
                 <div className="flex items-start justify-between">
                     <div>
-                        <h2 className="font-medium text-[#37352F] dark:text-[#D4D4D4]">
+                        <h2 className="text-lg font-bold text-[#37352F] dark:text-[#D4D4D4]">
                             {getTitle()}
                         </h2>
                         <p className="mt-1 text-xs text-[#787774] dark:text-[#9B9A97]">
@@ -118,7 +118,7 @@ export function EmailList({
                                 {visibleSenders.map((sender, i) => (
                                     <div
                                         key={sender.email}
-                                        className="relative z-30 hover:z-40"
+                                        className="relative z-10 hover:z-20"
                                         style={{ zIndex: 30 - i }}
                                     >
                                         {(() => {

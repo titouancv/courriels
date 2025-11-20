@@ -4,7 +4,7 @@ import { Sidebar } from './components/Sidebar'
 import { EmailList } from './components/EmailList'
 import { EmailView } from './components/EmailView'
 import { ComposeModal } from './components/ComposeModal'
-import { SearchInput } from './components/SearchInput'
+import { SearchInput } from './design-system/SearchInput'
 import { LoginPage } from './components/LoginPage'
 import { SettingsView } from './components/SettingsView'
 import { Button } from './design-system/Button'
@@ -25,7 +25,9 @@ function App() {
     const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null)
     const [user, setUser] = useState<User | null>(null)
     const [accessToken, setAccessToken] = useState<string | null>(null)
-    const [emails, setEmails] = useState<Email[]>([])
+    const [conversationEmails, setConversationEmails] = useState<Email[]>([])
+    const [notificationEmails, setNotificationEmails] = useState<Email[]>([])
+    const [trashEmails, setTrashEmails] = useState<Email[]>([])
     const [isComposeOpen, setIsComposeOpen] = useState(false)
     const [composeInitialTo, setComposeInitialTo] = useState('')
     const [composeInitialSubject, setComposeInitialSubject] = useState('')
@@ -69,19 +71,27 @@ function App() {
         }
     }, [darkMode])
 
-    const filteredEmails = emails.filter((email) => {
-        if (searchQuery) return true
-        if (currentFolder === 'notifications')
-            return email.messages.length === 1 && email.folder === 'inbox'
-        if (currentFolder === 'conversations')
-            return (
-                (email.messages.length > 1 || email.folder === 'sent') &&
-                email.folder !== 'trash'
-            )
-        return email.folder === 'trash'
-    })
+    const filteredEmails = (() => {
+        let emails: Email[] = []
+        if (currentFolder === 'conversations') emails = conversationEmails
+        else if (currentFolder === 'notifications') emails = notificationEmails
+        else if (currentFolder === 'trash') emails = trashEmails
+
+        return emails.filter((email) => {
+            if (searchQuery) return true
+            if (currentFolder === 'notifications')
+                return email.messages.length === 1 && email.folder === 'inbox'
+            if (currentFolder === 'conversations')
+                return (
+                    (email.messages.length > 1 || email.folder === 'sent') &&
+                    email.folder !== 'trash'
+                )
+            return email.folder === 'trash'
+        })
+    })()
+
     const selectedEmail =
-        emails.find((email) => email.id === selectedEmailId) || null
+        filteredEmails.find((email) => email.id === selectedEmailId) || null
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -98,7 +108,9 @@ function App() {
             } else {
                 setAccessToken(null)
                 setUser(null)
-                setEmails([])
+                setConversationEmails([])
+                setNotificationEmails([])
+                setTrashEmails([])
             }
         })
 
@@ -109,15 +121,19 @@ function App() {
         await supabase.auth.signOut()
         setAccessToken(null)
         setUser(null)
-        setEmails([])
+        setConversationEmails([])
+        setNotificationEmails([])
+        setTrashEmails([])
     }
 
     const refreshEmails = async (
         pageToken?: string,
-        queryOverride?: string
+        queryOverride?: string,
+        targetFolder?: FolderId
     ) => {
         if (!accessToken) return
 
+        const folderToFetch = targetFolder || currentFolder
         const currentFetchId = ++fetchIdRef.current
         setIsRefreshing(true)
         try {
@@ -128,7 +144,7 @@ function App() {
             if (activeSearch) {
                 query = activeSearch
             } else {
-                switch (currentFolder) {
+                switch (folderToFetch) {
                     case 'notifications':
                         query = ''
                         break
@@ -147,12 +163,22 @@ function App() {
                 pageToken
             )
 
-            if (currentFetchId !== fetchIdRef.current) return
+            if (currentFetchId !== fetchIdRef.current && !targetFolder) return
 
-            setNextPageToken(listData.nextPageToken || null)
+            if (!targetFolder) {
+                setNextPageToken(listData.nextPageToken || null)
+            }
+
+            const setEmails = (update: (prev: Email[]) => Email[]) => {
+                if (folderToFetch === 'conversations')
+                    setConversationEmails(update)
+                else if (folderToFetch === 'notifications')
+                    setNotificationEmails(update)
+                else if (folderToFetch === 'trash') setTrashEmails(update)
+            }
 
             if (!listData.threads) {
-                if (!pageToken) setEmails([])
+                if (!pageToken) setEmails(() => [])
                 return
             }
 
@@ -163,12 +189,12 @@ function App() {
             )
             const fetchedEmails = await Promise.all(emailPromises)
 
-            if (currentFetchId !== fetchIdRef.current) return
+            if (currentFetchId !== fetchIdRef.current && !targetFolder) return
 
             if (pageToken) {
                 setEmails((prev) => [...prev, ...fetchedEmails])
             } else {
-                setEmails(fetchedEmails)
+                setEmails(() => fetchedEmails)
             }
         } catch (error) {
             console.error('Failed to fetch data:', error)
@@ -218,32 +244,33 @@ function App() {
         }
 
         fetchUserInfo()
-        refreshEmails()
+
+        // Initial fetch for all folders
+        refreshEmails(undefined, undefined, 'conversations')
+        refreshEmails(undefined, undefined, 'notifications')
+        refreshEmails(undefined, undefined, 'trash')
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [accessToken, currentFolder])
+    }, [accessToken])
 
     useEffect(() => {
-        emails.map((email) => {
-            console.log(email.id, email.labels)
-        })
         setUnreadCounts({
-            conversations: emails.filter(
+            conversations: conversationEmails.filter(
                 (email) =>
                     (email.messages.length > 1 || email.folder === 'sent') &&
                     email.folder !== 'trash' &&
                     !email.read
             ).length,
-            notifications: emails.filter(
+            notifications: notificationEmails.filter(
                 (email) =>
                     email.messages.length === 1 &&
                     email.folder === 'inbox' &&
                     !email.read
             ).length,
-            trash: emails.filter(
+            trash: trashEmails.filter(
                 (email) => email.folder === 'trash' && !email.read
             ).length,
         })
-    }, [emails])
+    }, [conversationEmails, notificationEmails, trashEmails])
 
     const handleSendEmail = async (
         to: string,

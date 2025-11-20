@@ -8,6 +8,8 @@ import { MessageContent } from './MessageContent'
 import { AttachmentItem } from './AttachmentItem'
 import { ReplyBox } from './ReplyBox'
 
+import { FileCode, MoreHorizontal } from 'lucide-react'
+
 interface EmailViewProps {
     email: Email | null
     onSendReply: (body: string, attachments: File[]) => Promise<void>
@@ -27,6 +29,10 @@ export function EmailView({
     onClose,
 }: EmailViewProps) {
     const [isSending, setIsSending] = useState(false)
+    const [showOriginal, setShowOriginal] = useState(false)
+    const [activeMenuMessageId, setActiveMenuMessageId] = useState<
+        string | null
+    >(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
     const scrollToBottom = () => {
@@ -128,46 +134,113 @@ export function EmailView({
                                     </div>
                                 </div>
                             </div>
-
                             <div
                                 className={clsx(
-                                    'prose prose-stone dark:prose-invert max-w-2xl rounded-lg p-4',
-                                    isMe
-                                        ? 'bg-[#00712D]/5 text-[#37352F] dark:bg-[#00712D]/20 dark:text-[#D4D4D4]'
-                                        : 'bg-[#F7F7F5] text-[#37352F] dark:bg-[#202020] dark:text-[#D4D4D4]'
+                                    'flex items-center gap-2',
+                                    isMe && 'flex-row-reverse'
                                 )}
                             >
-                                <MessageContent
-                                    content={message.content}
-                                    originalContent={message.originalContent}
-                                    attachments={message.attachments}
-                                    messageId={message.id}
-                                    onFetchAttachment={onFetchAttachment}
-                                />
-
-                                {message.attachments &&
-                                    message.attachments.length > 0 && (
-                                        <div className="mt-4 border-t border-black/5 pt-4 dark:border-white/10">
-                                            {message.attachments
-                                                .filter(
-                                                    (a) =>
-                                                        !a.contentId ||
-                                                        !a.mimeType.startsWith(
-                                                            'image/'
-                                                        )
-                                                )
-                                                .map((attachment) => (
-                                                    <AttachmentItem
-                                                        key={attachment.id}
-                                                        attachment={attachment}
-                                                        messageId={message.id}
-                                                        onFetchAttachment={
-                                                            onFetchAttachment
-                                                        }
-                                                    />
-                                                ))}
-                                        </div>
+                                <div
+                                    className={clsx(
+                                        'prose prose-stone dark:prose-invert max-w-2xl rounded-lg p-4',
+                                        isMe
+                                            ? 'bg-[#00712D]/5 text-[#37352F] dark:bg-[#00712D]/20 dark:text-[#D4D4D4]'
+                                            : 'bg-[#F7F7F5] text-[#37352F] dark:bg-[#202020] dark:text-[#D4D4D4]'
                                     )}
+                                >
+                                    <MessageContent
+                                        content={message.content}
+                                        originalContent={
+                                            message.originalContent
+                                        }
+                                        attachments={message.attachments}
+                                        messageId={message.id}
+                                        onFetchAttachment={onFetchAttachment}
+                                    />
+
+                                    {message.attachments &&
+                                        message.attachments.length > 0 && (
+                                            <div className="mt-4 border-t border-black/5 pt-4 dark:border-white/10">
+                                                {message.attachments
+                                                    .filter(
+                                                        (a) =>
+                                                            !a.contentId ||
+                                                            !a.mimeType.startsWith(
+                                                                'image/'
+                                                            )
+                                                    )
+                                                    .map((attachment) => (
+                                                        <AttachmentItem
+                                                            key={attachment.id}
+                                                            attachment={
+                                                                attachment
+                                                            }
+                                                            messageId={
+                                                                message.id
+                                                            }
+                                                            onFetchAttachment={
+                                                                onFetchAttachment
+                                                            }
+                                                        />
+                                                    ))}
+                                            </div>
+                                        )}
+                                </div>
+                                {message.originalContent && (
+                                    <div className="relative">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() =>
+                                                setActiveMenuMessageId(
+                                                    activeMenuMessageId ===
+                                                        message.id
+                                                        ? null
+                                                        : message.id
+                                                )
+                                            }
+                                            className="h-8 w-8 text-[#9B9A97] hover:bg-[#EFEFED] hover:text-[#37352F] dark:hover:bg-[#2F2F2F] dark:hover:text-[#D4D4D4]"
+                                            icon={MoreHorizontal}
+                                        />
+                                        {activeMenuMessageId === message.id && (
+                                            <>
+                                                <div
+                                                    className="fixed inset-0 z-10"
+                                                    onClick={() =>
+                                                        setActiveMenuMessageId(
+                                                            null
+                                                        )
+                                                    }
+                                                />
+                                                <div
+                                                    className={clsx(
+                                                        'absolute z-20 mt-1 w-48 rounded-md border border-[#E9E9E7] bg-white py-1 shadow-lg dark:border-[#2F2F2F] dark:bg-[#191919]',
+                                                        isMe
+                                                            ? 'right-0'
+                                                            : 'left-0'
+                                                    )}
+                                                >
+                                                    <button
+                                                        onClick={() => {
+                                                            setShowOriginal(
+                                                                !showOriginal
+                                                            )
+                                                            setActiveMenuMessageId(
+                                                                null
+                                                            )
+                                                        }}
+                                                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-[#37352F] hover:bg-[#F7F7F5] dark:text-[#D4D4D4] dark:hover:bg-[#202020]"
+                                                    >
+                                                        <FileCode className="h-4 w-4" />
+                                                        {showOriginal
+                                                            ? 'Show cleaned view'
+                                                            : 'Show original format'}
+                                                    </button>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )
