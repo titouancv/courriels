@@ -119,7 +119,7 @@ export function EmailView({
                                     )}
                                 >
                                     <div className="font-medium text-[#37352F] dark:text-[#D4D4D4]">
-                                        {message.sender.name}
+                                        {isMe ? 'Me' : message.sender.name}
                                     </div>
                                     <div className="text-xs text-[#787774] dark:text-[#9B9A97]">
                                         {formatEmailDate(message.date, {
