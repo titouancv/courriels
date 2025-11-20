@@ -1,20 +1,7 @@
 import React from 'react'
 import type { FolderId, User } from '../types'
-import {
-    Bell,
-    MessageSquare,
-    Trash2,
-    LogIn,
-    LogOut,
-    Moon,
-    Sun,
-} from 'lucide-react'
+import { Bell, MessageSquare, Trash2, LogIn } from 'lucide-react'
 import { clsx } from 'clsx'
-import {
-    useGoogleLogin,
-    googleLogout,
-    type TokenResponse,
-} from '@react-oauth/google'
 import { Button } from '../design-system/Button'
 
 interface SidebarProps {
@@ -22,10 +9,7 @@ interface SidebarProps {
     onFolderChange: (folder: FolderId) => void
     unreadCounts: Record<FolderId, number>
     user: User | null
-    onLoginSuccess: (tokenResponse: TokenResponse) => void
-    onLogout: () => void
-    darkMode: boolean
-    toggleDarkMode: () => void
+    onOpenSettings: () => void
 }
 
 export function Sidebar({
@@ -33,22 +17,8 @@ export function Sidebar({
     onFolderChange,
     unreadCounts,
     user,
-    onLoginSuccess,
-    onLogout,
-    darkMode,
-    toggleDarkMode,
+    onOpenSettings,
 }: SidebarProps) {
-    const login = useGoogleLogin({
-        onSuccess: onLoginSuccess,
-        scope: 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send',
-    })
-
-    const handleLogout = (e: React.MouseEvent) => {
-        e.stopPropagation()
-        googleLogout()
-        onLogout()
-    }
-
     const folders: { id: FolderId; icon: React.ElementType; label: string }[] =
         [
             {
@@ -90,17 +60,9 @@ export function Sidebar({
             </div>
 
             <div className="mt-auto border-t border-[#E9E9E7] p-4 dark:border-[#2F2F2F]">
-                <Button
-                    onClick={toggleDarkMode}
-                    variant="ghost"
-                    className="w-full justify-start dark:text-[#D4D4D4] dark:hover:bg-[#2F2F2F]"
-                    icon={darkMode ? Sun : Moon}
-                >
-                    {darkMode ? 'Light Mode' : 'Dark Mode'}
-                </Button>
                 <div
                     className="mb-4 flex cursor-pointer items-center gap-2 rounded px-2 py-1 transition-colors hover:bg-[#EFEFED] dark:hover:bg-[#2F2F2F]"
-                    onClick={() => !user && login()}
+                    onClick={() => user && onOpenSettings()}
                 >
                     {user ? (
                         <>
@@ -116,16 +78,8 @@ export function Sidebar({
                                 </div>
                             )}
                             <span className="truncate text-sm font-medium">
-                                {user.email}
+                                {user.name}
                             </span>
-                            <Button
-                                variant="icon"
-                                size="icon"
-                                onClick={handleLogout}
-                                className="ml-auto hover:text-red-500"
-                                title="Logout"
-                                icon={LogOut}
-                            />
                         </>
                     ) : (
                         <>

@@ -1,16 +1,17 @@
-import { useGoogleLogin, type TokenResponse } from '@react-oauth/google'
 import { Button } from '../design-system/Button'
 import { LogIn } from 'lucide-react'
+import { supabase } from '../lib/supabase'
 
-interface LoginPageProps {
-    onLoginSuccess: (tokenResponse: TokenResponse) => void
-}
-
-export function LoginPage({ onLoginSuccess }: LoginPageProps) {
-    const login = useGoogleLogin({
-        onSuccess: onLoginSuccess,
-        scope: 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send',
-    })
+export function LoginPage() {
+    const handleLogin = async () => {
+        await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                scopes: 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+                redirectTo: window.location.origin,
+            },
+        })
+    }
 
     return (
         <div className="flex h-screen w-screen flex-col items-center justify-center bg-[#F7F7F5] transition-colors duration-200 dark:bg-[#191919]">
@@ -42,7 +43,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
                         Connect your Gmail account to get started
                     </p>
                     <Button
-                        onClick={() => login()}
+                        onClick={handleLogin}
                         className="w-full justify-center gap-2"
                         icon={LogIn}
                     >

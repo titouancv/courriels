@@ -6,10 +6,11 @@ import { EmailView } from './components/EmailView'
 import { ComposeModal } from './components/ComposeModal'
 import { SearchInput } from './components/SearchInput'
 import { LoginPage } from './components/LoginPage'
+import { SettingsView } from './components/SettingsView'
 import { Button } from './design-system/Button'
 import { Plus } from 'lucide-react'
 import type { FolderId, User, Email } from './types'
-import type { TokenResponse } from '@react-oauth/google'
+import { supabase, saveUserToSupabase, getUserProfile } from './lib/supabase'
 import {
     fetchThreadsList,
     fetchThreadDetails,
@@ -43,6 +44,7 @@ function App() {
     const [composeReferences, setComposeReferences] = useState<
         string | undefined
     >(undefined)
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false)
     const [isRefreshing, setIsRefreshing] = useState(false)
     const [nextPageToken, setNextPageToken] = useState<string | null>(null)
     const [searchQuery, setSearchQuery] = useState('')
@@ -83,22 +85,32 @@ function App() {
         emails.find((email) => email.id === selectedEmailId) || null
 
     useEffect(() => {
-        const storedToken = localStorage.getItem('gmail_token')
-        if (storedToken) {
-            setAccessToken(storedToken)
-        }
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session?.provider_token) {
+                setAccessToken(session.provider_token)
+            }
+        })
+
+        const {
+            data: { subscription },
+        } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (session?.provider_token) {
+                setAccessToken(session.provider_token)
+            } else {
+                setAccessToken(null)
+                setUser(null)
+                setEmails([])
+            }
+        })
+
+        return () => subscription.unsubscribe()
     }, [])
 
-    const handleLoginSuccess = (tokenResponse: TokenResponse) => {
-        setAccessToken(tokenResponse.access_token)
-        localStorage.setItem('gmail_token', tokenResponse.access_token)
-    }
-
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        await supabase.auth.signOut()
         setAccessToken(null)
         setUser(null)
         setEmails([])
-        localStorage.removeItem('gmail_token')
     }
 
     const refreshEmails = async (
@@ -182,8 +194,25 @@ function App() {
 
         const fetchUserInfo = async () => {
             try {
-                const userData = await fetchUserInfoService(accessToken)
-                setUser(userData)
+                const {
+                    data: { session },
+                } = await supabase.auth.getSession()
+
+                if (session?.user?.id) {
+                    const profile = await getUserProfile(session.user.id)
+
+                    if (profile) {
+                        setUser({
+                            email: profile.email,
+                            name: profile.full_name,
+                            picture: profile.avatar_url,
+                        })
+                    } else {
+                        const userData = await fetchUserInfoService(accessToken)
+                        setUser(userData)
+                        await saveUserToSupabase(userData, session.user.id)
+                    }
+                }
             } catch (error) {
                 console.error('Failed to fetch user info:', error)
             }
@@ -300,7 +329,7 @@ function App() {
     }, [accessToken])
 
     if (!accessToken) {
-        return <LoginPage onLoginSuccess={handleLoginSuccess} />
+        return <LoginPage />
     }
 
     return (
@@ -310,51 +339,67 @@ function App() {
                 onFolderChange={(folder) => {
                     setCurrentFolder(folder)
                     setSearchQuery('')
+                    setIsSettingsOpen(false)
                 }}
                 unreadCounts={unreadCounts}
                 user={user}
-                onLoginSuccess={handleLoginSuccess}
-                onLogout={handleLogout}
-                darkMode={darkMode}
-                toggleDarkMode={() => setDarkMode(!darkMode)}
+                onOpenSettings={() => {
+                    setIsSettingsOpen(true)
+                    setSelectedEmailId(null)
+                }}
             />
 
             <div className="flex min-w-0 flex-1 flex-col">
-                <div className="flex h-16 items-center justify-between border-b border-[#E9E9E7] bg-white px-6 dark:border-[#2F2F2F] dark:bg-[#191919]">
-                    <div className="w-96">
-                        <SearchInput
-                            value={searchQuery}
-                            onChange={handleSearch}
-                            placeholder="Search emails..."
-                        />
+                {!isSettingsOpen && (
+                    <div className="flex h-16 items-center justify-between border-b border-[#E9E9E7] bg-white px-6 dark:border-[#2F2F2F] dark:bg-[#191919]">
+                        <div className="w-96">
+                            <SearchInput
+                                value={searchQuery}
+                                onChange={handleSearch}
+                                placeholder="Search emails..."
+                            />
+                        </div>
+                        <Button onClick={handleComposeOpen} icon={Plus}>
+                            New Message
+                        </Button>
                     </div>
-                    <Button onClick={handleComposeOpen} icon={Plus}>
-                        New Message
-                    </Button>
-                </div>
+                )}
 
                 <div className="flex min-h-0 flex-1">
-                    <EmailList
-                        emails={filteredEmails}
-                        selectedEmailId={selectedEmailId}
-                        onSelectEmail={setSelectedEmailId}
-                        onRefresh={() => refreshEmails()}
-                        isRefreshing={isRefreshing}
-                        onLoadMore={() =>
-                            nextPageToken && refreshEmails(nextPageToken)
-                        }
-                        hasMore={!!nextPageToken}
-                        currentUser={user}
-                        searchQuery={searchQuery}
-                        currentFolder={currentFolder}
-                    />
-                    <EmailView
-                        email={selectedEmail}
-                        onSendReply={handleInlineReply}
-                        currentUserEmail={user?.email}
-                        onFetchAttachment={fetchAttachment}
-                        onClose={() => setSelectedEmailId(null)}
-                    />
+                    {isSettingsOpen && user ? (
+                        <SettingsView
+                            user={user}
+                            onUpdateUser={setUser}
+                            onLogout={handleLogout}
+                            darkMode={darkMode}
+                            toggleDarkMode={() => setDarkMode(!darkMode)}
+                        />
+                    ) : (
+                        <>
+                            <EmailList
+                                emails={filteredEmails}
+                                selectedEmailId={selectedEmailId}
+                                onSelectEmail={setSelectedEmailId}
+                                onRefresh={() => refreshEmails()}
+                                isRefreshing={isRefreshing}
+                                onLoadMore={() =>
+                                    nextPageToken &&
+                                    refreshEmails(nextPageToken)
+                                }
+                                hasMore={!!nextPageToken}
+                                currentUser={user}
+                                searchQuery={searchQuery}
+                                currentFolder={currentFolder}
+                            />
+                            <EmailView
+                                email={selectedEmail}
+                                onSendReply={handleInlineReply}
+                                currentUserEmail={user?.email}
+                                onFetchAttachment={fetchAttachment}
+                                onClose={() => setSelectedEmailId(null)}
+                            />
+                        </>
+                    )}
                 </div>
             </div>
 
