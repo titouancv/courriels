@@ -12,15 +12,15 @@ import {
 
 export function useEmails(accessToken: string | null) {
     const [conversationEmails, setConversationEmails] = useState<Email[]>([])
-    const [notificationEmails, setNotificationEmails] = useState<Email[]>([])
+    const [inboxEmails, setInboxEmails] = useState<Email[]>([])
     const [trashEmails, setTrashEmails] = useState<Email[]>([])
     const [isRefreshing, setIsRefreshing] = useState(false)
     const [isLoading, setIsLoading] = useState(true)
     const [unreadCounts, setUnreadCounts] = useState<{
         conversations: number
-        notifications: number
+        inbox: number
         trash: number
-    }>({ conversations: 0, notifications: 0, trash: 0 })
+    }>({ conversations: 0, inbox: 0, trash: 0 })
     const [nextPageToken, setNextPageToken] = useState<string | null>(null)
     const fetchIdRef = useRef(0)
     const activeRequestsRef = useRef(0)
@@ -57,9 +57,9 @@ export function useEmails(accessToken: string | null) {
                 const setEmails = (update: (prev: Email[]) => Email[]) => {
                     if (folderToFetch === 'conversations')
                         setConversationEmails(update)
-                    else if (folderToFetch === 'notifications')
-                        setNotificationEmails(update)
-                    else if (folderToFetch === 'trash') setTrashEmails(update)
+                    else if (folderToFetch === 'inbox') {
+                        setInboxEmails(update)
+                    } else if (folderToFetch === 'trash') setTrashEmails(update)
                 }
 
                 if (pageToken) {
@@ -102,12 +102,7 @@ export function useEmails(accessToken: string | null) {
                         undefined,
                         'conversations'
                     ),
-                    refreshEmails(
-                        'notifications',
-                        undefined,
-                        undefined,
-                        'notifications'
-                    ),
+                    refreshEmails('inbox', undefined, undefined, 'inbox'),
                     refreshEmails('trash', undefined, undefined, 'trash'),
                 ])
                 setIsLoading(false)
@@ -116,9 +111,9 @@ export function useEmails(accessToken: string | null) {
                         accessToken,
                         'from:me is:unread'
                     ),
-                    notifications: await getUnreadCountByCategory(
+                    inbox: await getUnreadCountByCategory(
                         accessToken,
-                        'is:unread'
+                        'label:INBOX is:unread'
                     ),
                     trash: await getUnreadCountByCategory(
                         accessToken,
@@ -129,7 +124,7 @@ export function useEmails(accessToken: string | null) {
             init()
         } else {
             setConversationEmails([])
-            setNotificationEmails([])
+            setInboxEmails([])
             setTrashEmails([])
         }
     }, [accessToken])
@@ -143,15 +138,16 @@ export function useEmails(accessToken: string | null) {
 
         const setEmails = (update: (prev: Email[]) => Email[]) => {
             if (folder === 'conversations') setConversationEmails(update)
-            else if (folder === 'notifications') setNotificationEmails(update)
-            else if (folder === 'trash') setTrashEmails(update)
+            else if (folder === 'inbox') {
+                setInboxEmails(update)
+            } else if (folder === 'trash') setTrashEmails(update)
         }
 
         const previousEmails =
             folder === 'conversations'
                 ? conversationEmails
-                : folder === 'notifications'
-                  ? notificationEmails
+                : folder === 'inbox'
+                  ? inboxEmails
                   : trashEmails
 
         // Optimistic update
@@ -177,15 +173,16 @@ export function useEmails(accessToken: string | null) {
 
         const setEmails = (update: (prev: Email[]) => Email[]) => {
             if (folder === 'conversations') setConversationEmails(update)
-            else if (folder === 'notifications') setNotificationEmails(update)
-            else if (folder === 'trash') setTrashEmails(update)
+            else if (folder === 'inbox') {
+                setInboxEmails(update)
+            } else if (folder === 'trash') setTrashEmails(update)
         }
 
         const previousEmails =
             folder === 'conversations'
                 ? conversationEmails
-                : folder === 'notifications'
-                  ? notificationEmails
+                : folder === 'inbox'
+                  ? inboxEmails
                   : trashEmails
 
         // Optimistic update
@@ -207,15 +204,16 @@ export function useEmails(accessToken: string | null) {
 
         const setEmails = (update: (prev: Email[]) => Email[]) => {
             if (folder === 'conversations') setConversationEmails(update)
-            else if (folder === 'notifications') setNotificationEmails(update)
-            else if (folder === 'trash') setTrashEmails(update)
+            else if (folder === 'inbox') {
+                setInboxEmails(update)
+            } else if (folder === 'trash') setTrashEmails(update)
         }
 
         const emails =
             folder === 'conversations'
                 ? conversationEmails
-                : folder === 'notifications'
-                  ? notificationEmails
+                : folder === 'inbox'
+                  ? inboxEmails
                   : trashEmails
 
         const email = emails.find((e) => e.id === emailId)
@@ -235,7 +233,7 @@ export function useEmails(accessToken: string | null) {
 
     return {
         conversationEmails,
-        notificationEmails,
+        inboxEmails,
         trashEmails,
         isRefreshing,
         isLoading,
@@ -243,7 +241,7 @@ export function useEmails(accessToken: string | null) {
         refreshEmails,
         unreadCounts,
         setConversationEmails,
-        setNotificationEmails,
+        setInboxEmails,
         setTrashEmails,
         deleteEmail,
         markAsRead,

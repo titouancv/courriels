@@ -41,7 +41,7 @@ export interface Email {
     isFullDetails?: boolean
 }
 
-export type FolderId = 'notifications' | 'conversations' | 'trash'
+export type FolderId = 'inbox' | 'conversations' | 'trash'
 
 export interface User {
     email: string

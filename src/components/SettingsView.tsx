@@ -62,12 +62,7 @@ export function SettingsView({
             <div className="mx-auto max-w-2xl">
                 <div className="mb-8 flex items-center justify-between">
                     <h2 className="text-2xl font-semibold">Settings</h2>
-                    <Button
-                        variant="icon"
-                        onClick={onClose}
-                        icon={X}
-                        className="md:hidden"
-                    />
+                    <Button variant="icon" onClick={onClose} icon={X} />
                 </div>
 
                 <div className="space-y-6">
@@ -94,22 +89,6 @@ export function SettingsView({
                         />
                     </div>
 
-                    <div>
-                        <label className="mb-2 block text-sm font-medium">
-                            Appearance
-                        </label>
-                        <Button
-                            onClick={toggleDarkMode}
-                            variant="secondary"
-                            className="w-full justify-start gap-2"
-                            icon={darkMode ? Sun : Moon}
-                        >
-                            {darkMode
-                                ? 'Switch to Light Mode'
-                                : 'Switch to Dark Mode'}
-                        </Button>
-                    </div>
-
                     <div className="flex items-center gap-4 pt-4">
                         <Button onClick={handleSave} disabled={isLoading}>
                             {isLoading ? 'Saving...' : 'Save Changes'}
@@ -121,6 +100,20 @@ export function SettingsView({
                                 {message}
                             </span>
                         )}
+                    </div>
+
+                    <div className="border-t border-[#E9E9E7] pt-6 dark:border-[#2F2F2F]">
+                        <h3 className="mb-4 text-lg font-medium">Appearance</h3>
+                        <Button
+                            onClick={toggleDarkMode}
+                            variant="secondary"
+                            className="w-full justify-start gap-2"
+                            icon={darkMode ? Sun : Moon}
+                        >
+                            {darkMode
+                                ? 'Switch to Light Mode'
+                                : 'Switch to Dark Mode'}
+                        </Button>
                     </div>
 
                     <div className="border-t border-[#E9E9E7] pt-6 dark:border-[#2F2F2F]">

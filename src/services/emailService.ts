@@ -13,8 +13,8 @@ export async function getEmailsForFolder(
         query = queryOverride
     } else {
         switch (folder) {
-            case 'notifications':
-                query = ''
+            case 'inbox':
+                query = 'label:INBOX'
                 break
             case 'conversations':
                 query = 'from:me'

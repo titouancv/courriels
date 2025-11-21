@@ -6,6 +6,7 @@ interface SearchInputProps {
     onChange: (value: string) => void
     placeholder?: string
     className?: string
+    inputRef?: React.RefObject<HTMLInputElement | null>
 }
 
 export function SearchInput({
@@ -13,11 +14,13 @@ export function SearchInput({
     onChange,
     placeholder = 'Search...',
     className,
+    inputRef,
 }: SearchInputProps) {
     return (
         <div className={clsx('relative', className)}>
             <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[#9B9A97]" />
             <input
+                ref={inputRef}
                 type="text"
                 placeholder={placeholder}
                 value={value}

@@ -147,6 +147,7 @@ export function EmailView({
                             onClick={onClose}
                             title="Close"
                             icon={X}
+                            className="invisible md:visible"
                         />
                     </div>
                 </div>

@@ -36,6 +36,7 @@ export function ReplyBox({ onSend, isSending }: ReplyBoxProps) {
             if (textareaRef.current) {
                 textareaRef.current.style.height = 'auto'
             }
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (error) {
             // Error handled by parent
         }
@@ -78,13 +79,13 @@ export function ReplyBox({ onSend, isSending }: ReplyBoxProps) {
             )}
 
             <div className="flex items-end gap-2">
-                <div className="flex-1">
+                <div className="flex-1 rounded-lg border border-[#E9E9E7] bg-white p-2 text-[#37352F] placeholder-[#9B9A97] focus:ring-2 focus:ring-[#00712D]/20 focus:outline-none dark:border-[#2F2F2F] dark:bg-[#202020] dark:text-[#D4D4D4]">
                     <textarea
                         ref={textareaRef}
                         value={body}
                         onChange={handleTextareaChange}
                         placeholder="Type a message..."
-                        className="max-h-[250px] min-h-[80px] w-full resize-none rounded-lg border border-[#E9E9E7] bg-white p-3 text-[#37352F] placeholder-[#9B9A97] focus:ring-2 focus:ring-[#00712D]/20 focus:outline-none dark:border-[#2F2F2F] dark:bg-[#202020] dark:text-[#D4D4D4]"
+                        className="max-h-[350px] min-h-[80px] w-full resize-none p-3 focus:outline-none"
                         onKeyDown={(e) => {
                             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                                 handleSend()

@@ -63,8 +63,8 @@ export function EmailList({
     const getTitle = () => {
         if (searchQuery) return 'Search'
         switch (currentFolder) {
-            case 'notifications':
-                return 'Notifications'
+            case 'inbox':
+                return 'Inbox'
             case 'conversations':
                 return 'Conversations'
             case 'trash':
@@ -77,8 +77,8 @@ export function EmailList({
     const getDescription = () => {
         if (searchQuery) return `Results for "${searchQuery}"`
         switch (currentFolder) {
-            case 'notifications':
-                return 'Updates, alerts, and newsletters'
+            case 'inbox':
+                return 'All your messages'
             case 'conversations':
                 return 'Email sent and threads'
             case 'trash':

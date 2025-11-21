@@ -4,22 +4,22 @@ import { Sidebar } from './components/Sidebar'
 import { EmailList } from './components/EmailList'
 import { EmailView } from './components/EmailView'
 import { ComposeView } from './components/ComposeView'
-import { SearchInput } from './design-system/SearchInput'
+import { SearchModal } from './components/SearchModal'
 import { LoginPage } from './components/LoginPage'
 import { SettingsView } from './components/SettingsView'
-import { Button } from './design-system/Button'
-import { Plus, Menu } from 'lucide-react'
 import { clsx } from 'clsx'
 import type { FolderId, Email } from './types'
 import { sendEmailMessage, fetchAttachmentData } from './services/gmailApi'
+import { getEmailsForFolder } from './services/emailService'
 import { useAuth } from './hooks/useAuth'
 import { useEmails } from './hooks/useEmails'
+import { SkeletonTheme } from 'react-loading-skeleton'
 
 function App() {
     const { user, accessToken, logout, setUser } = useAuth()
     const {
         conversationEmails,
-        notificationEmails,
+        inboxEmails,
         trashEmails,
         isRefreshing,
         isLoading,
@@ -32,13 +32,12 @@ function App() {
     } = useEmails(accessToken)
 
     const [currentFolder, setCurrentFolder] = useState<FolderId>(() => {
-        if (typeof window === 'undefined') return 'conversations'
+        if (typeof window === 'undefined') return 'inbox'
         const params = new URLSearchParams(window.location.search)
         const folder = params.get('folder') as FolderId
-        return folder &&
-            ['conversations', 'notifications', 'trash'].includes(folder)
+        return folder && ['inbox', 'conversations', 'trash'].includes(folder)
             ? folder
-            : 'conversations'
+            : 'inbox'
     })
     const [selectedEmailId, setSelectedEmailId] = useState<string | null>(
         () => {
@@ -48,7 +47,6 @@ function App() {
         }
     )
     const [searchQuery, setSearchQuery] = useState('')
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
     const [isComposeOpen, setIsComposeOpen] = useState(() => {
         if (typeof window === 'undefined') return false
@@ -63,6 +61,9 @@ function App() {
         const params = new URLSearchParams(window.location.search)
         return params.get('settings') === 'true'
     })
+    const [isSearchOpen, setIsSearchOpen] = useState(false)
+    const [searchResults, setSearchResults] = useState<Email[]>([])
+    const [isSearching, setIsSearching] = useState(false)
 
     const [darkMode, setDarkMode] = useState(() => {
         if (typeof window !== 'undefined') {
@@ -85,19 +86,40 @@ function App() {
         }
     }, [darkMode])
 
+    // Search effect
     useEffect(() => {
-        const timer = setTimeout(() => {
-            if (accessToken) {
-                refreshEmails(
-                    currentFolder,
-                    undefined,
-                    searchQuery || undefined
-                )
+        const timer = setTimeout(async () => {
+            if (searchQuery && accessToken && isSearchOpen) {
+                setIsSearching(true)
+                try {
+                    const { emails } = await getEmailsForFolder(
+                        accessToken,
+                        'inbox',
+                        undefined,
+                        searchQuery
+                    )
+                    setSearchResults(emails.slice(0, 10))
+                } catch (error) {
+                    console.error('Search failed', error)
+                } finally {
+                    setIsSearching(false)
+                }
+            } else {
+                setSearchResults([])
+                setSearchQuery('')
+                setIsSearching(false)
             }
-        }, 500)
+        }, 300)
 
         return () => clearTimeout(timer)
-    }, [searchQuery, currentFolder, accessToken, refreshEmails])
+    }, [searchQuery, accessToken, isSearchOpen])
+
+    // Folder refresh effect
+    useEffect(() => {
+        if (accessToken) {
+            refreshEmails(currentFolder)
+        }
+    }, [currentFolder, accessToken, refreshEmails])
 
     useEffect(() => {
         if (selectedEmailId && accessToken) {
@@ -133,14 +155,14 @@ function App() {
     const filteredEmails = (() => {
         let emails: Email[] = []
         if (currentFolder === 'conversations') emails = conversationEmails
-        else if (currentFolder === 'notifications') emails = notificationEmails
+        else if (currentFolder === 'inbox') emails = inboxEmails
         else if (currentFolder === 'trash') emails = trashEmails
         return emails
     })()
 
     const selectedEmail =
         conversationEmails.find((e) => e.id === selectedEmailId) ||
-        notificationEmails.find((e) => e.id === selectedEmailId) ||
+        inboxEmails.find((e) => e.id === selectedEmailId) ||
         trashEmails.find((e) => e.id === selectedEmailId) ||
         null
 
@@ -251,168 +273,147 @@ function App() {
     }
 
     return (
-        <div className="flex h-screen bg-white font-sans antialiased transition-colors duration-200 dark:bg-[#191919]">
-            <Toaster position="bottom-right" />
-
-            {/* Mobile Sidebar Overlay */}
-            {isMobileMenuOpen && (
-                <div
-                    className="fixed inset-0 z-40 bg-black/50 md:hidden"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                />
-            )}
-
-            {/* Sidebar */}
-            <div
-                className={clsx(
-                    'fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0',
-                    isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-                )}
-            >
-                <Sidebar
-                    currentFolder={currentFolder}
-                    onFolderChange={(folder) => {
-                        setCurrentFolder(folder)
-                        setIsSettingsOpen(false)
-                        setIsMobileMenuOpen(false)
-                    }}
-                    user={user}
-                    onOpenSettings={() => {
-                        setIsSettingsOpen(true)
-                        setSelectedEmailId(null)
-                        setIsMobileMenuOpen(false)
-                    }}
-                    unreadCounts={unreadCounts}
-                />
-            </div>
-
-            <div className="flex min-w-0 flex-1 flex-col">
-                {!isSettingsOpen && (
-                    <div className="flex h-16 items-center justify-between gap-4 border-b border-[#E9E9E7] bg-white px-4 md:px-6 dark:border-[#2F2F2F] dark:bg-[#191919]">
-                        <Button
-                            variant="icon"
-                            className="md:hidden"
-                            onClick={() => setIsMobileMenuOpen(true)}
-                            icon={Menu}
-                        />
-                        <div className="flex-1 md:w-96 md:flex-none">
-                            <SearchInput
-                                value={searchQuery}
-                                onChange={handleSearch}
-                                placeholder="Search..."
+        <SkeletonTheme
+            baseColor={darkMode ? '#333' : '#ebebeb'}
+            highlightColor={darkMode ? '#444' : '#f5f5f5'}
+        >
+            <div className="flex h-screen bg-white font-sans antialiased transition-colors duration-200 dark:bg-[#191919]">
+                <Toaster position="bottom-right" />
+                <div className="flex min-w-0 flex-1 flex-col">
+                    <div className="relative flex min-h-0 flex-1">
+                        {isSettingsOpen && user ? (
+                            <SettingsView
+                                user={user}
+                                onUpdateUser={setUser}
+                                onLogout={logout}
+                                darkMode={darkMode}
+                                toggleDarkMode={() => setDarkMode(!darkMode)}
+                                onClose={() => setIsSettingsOpen(false)}
                             />
-                        </div>
-                        <Button
-                            onClick={handleComposeOpen}
-                            icon={Plus}
-                            className="shrink-0"
-                        >
-                            <span className="hidden md:inline">
-                                New Message
-                            </span>
-                            <span className="md:hidden">New</span>
-                        </Button>
-                    </div>
-                )}
-
-                <div className="relative flex min-h-0 flex-1">
-                    {isSettingsOpen && user ? (
-                        <SettingsView
-                            user={user}
-                            onUpdateUser={setUser}
-                            onLogout={logout}
-                            darkMode={darkMode}
-                            toggleDarkMode={() => setDarkMode(!darkMode)}
-                            onClose={() => setIsSettingsOpen(false)}
-                        />
-                    ) : (
-                        <>
-                            <EmailList
-                                emails={filteredEmails}
-                                selectedEmailId={
-                                    selectedEmail ? selectedEmailId : null
-                                }
-                                onSelectEmail={(id) => {
-                                    setSelectedEmailId(id)
-                                    setIsComposeOpen(false)
-                                    const email = filteredEmails.find(
-                                        (e) => e.id === id
-                                    )
-                                    if (email && !email.read) {
-                                        markAsRead(
-                                            email.id,
-                                            email.threadId,
-                                            currentFolder
+                        ) : (
+                            <>
+                                <Sidebar
+                                    currentFolder={currentFolder}
+                                    onFolderChange={(folder) => {
+                                        setCurrentFolder(folder)
+                                        setIsSettingsOpen(false)
+                                    }}
+                                    user={user}
+                                    onOpenSettings={() => {
+                                        setIsSettingsOpen(true)
+                                        setSelectedEmailId(null)
+                                    }}
+                                    unreadCounts={unreadCounts}
+                                    onCompose={handleComposeOpen}
+                                    onSearch={() => setIsSearchOpen(true)}
+                                />
+                                <EmailList
+                                    emails={filteredEmails}
+                                    selectedEmailId={
+                                        selectedEmail ? selectedEmailId : null
+                                    }
+                                    onSelectEmail={(id) => {
+                                        setSelectedEmailId(id)
+                                        setIsComposeOpen(false)
+                                        const email = filteredEmails.find(
+                                            (e) => e.id === id
+                                        )
+                                        if (email && !email.read) {
+                                            markAsRead(
+                                                email.id,
+                                                email.threadId,
+                                                currentFolder
+                                            )
+                                        }
+                                    }}
+                                    onRefresh={() =>
+                                        refreshEmails(
+                                            currentFolder,
+                                            undefined,
+                                            searchQuery
                                         )
                                     }
-                                }}
-                                onRefresh={() =>
-                                    refreshEmails(
-                                        currentFolder,
-                                        undefined,
-                                        searchQuery
-                                    )
-                                }
-                                isRefreshing={isRefreshing}
-                                onLoadMore={loadMore}
-                                hasMore={hasMore}
-                                currentUser={user}
-                                searchQuery={searchQuery}
-                                currentFolder={currentFolder}
-                                className={clsx(
-                                    (isComposeOpen ||
-                                        (selectedEmailId && selectedEmail)) &&
-                                        'hidden md:flex'
-                                )}
-                            />
-                            {(isComposeOpen ||
-                                (selectedEmailId && selectedEmail)) && (
-                                <div className="absolute inset-0 z-10 flex flex-col bg-white md:static md:min-w-0 md:flex-1 dark:bg-[#191919]">
-                                    {isComposeOpen ? (
-                                        <ComposeView
-                                            onClose={() =>
-                                                setIsComposeOpen(false)
-                                            }
-                                            onSend={handleSendEmail}
-                                            initialTo={composeInitialTo}
-                                            initialSubject={
-                                                composeInitialSubject
-                                            }
-                                            initialBody={composeInitialBody}
-                                        />
-                                    ) : (
-                                        <EmailView
-                                            email={selectedEmail}
-                                            onSendReply={handleInlineReply}
-                                            onForward={handleForward}
-                                            onDelete={(emailId, threadId) =>
-                                                deleteEmail(
-                                                    emailId,
-                                                    threadId,
-                                                    currentFolder
-                                                )
-                                            }
-                                            onMarkAsRead={(emailId, threadId) =>
-                                                markAsRead(
-                                                    emailId,
-                                                    threadId,
-                                                    currentFolder
-                                                )
-                                            }
-                                            currentUserEmail={user?.email}
-                                            onFetchAttachment={fetchAttachment}
-                                            onClose={() =>
-                                                setSelectedEmailId(null)
-                                            }
-                                        />
+                                    isRefreshing={isRefreshing}
+                                    onLoadMore={loadMore}
+                                    hasMore={hasMore}
+                                    currentUser={user}
+                                    searchQuery={searchQuery}
+                                    currentFolder={currentFolder}
+                                    className={clsx(
+                                        (isComposeOpen ||
+                                            (selectedEmailId &&
+                                                selectedEmail)) &&
+                                            'hidden md:flex'
                                     )}
-                                </div>
-                            )}
-                        </>
-                    )}
+                                />
+                                {(isComposeOpen ||
+                                    (selectedEmailId && selectedEmail)) && (
+                                    <div className="absolute inset-0 z-10 flex flex-col bg-white md:static md:min-w-0 md:flex-1 dark:bg-[#191919]">
+                                        {isComposeOpen ? (
+                                            <ComposeView
+                                                onClose={() =>
+                                                    setIsComposeOpen(false)
+                                                }
+                                                onSend={handleSendEmail}
+                                                initialTo={composeInitialTo}
+                                                initialSubject={
+                                                    composeInitialSubject
+                                                }
+                                                initialBody={composeInitialBody}
+                                            />
+                                        ) : (
+                                            <EmailView
+                                                email={selectedEmail}
+                                                onSendReply={handleInlineReply}
+                                                onForward={handleForward}
+                                                onDelete={(emailId, threadId) =>
+                                                    deleteEmail(
+                                                        emailId,
+                                                        threadId,
+                                                        currentFolder
+                                                    )
+                                                }
+                                                onMarkAsRead={(
+                                                    emailId,
+                                                    threadId
+                                                ) =>
+                                                    markAsRead(
+                                                        emailId,
+                                                        threadId,
+                                                        currentFolder
+                                                    )
+                                                }
+                                                currentUserEmail={user?.email}
+                                                onFetchAttachment={
+                                                    fetchAttachment
+                                                }
+                                                onClose={() =>
+                                                    setSelectedEmailId(null)
+                                                }
+                                            />
+                                        )}
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
                 </div>
+                <SearchModal
+                    isOpen={isSearchOpen}
+                    onClose={() => setIsSearchOpen(false)}
+                    searchQuery={searchQuery}
+                    onSearchChange={handleSearch}
+                    results={searchResults}
+                    isLoading={isSearching}
+                    onSelectResult={(emailId) => {
+                        setSelectedEmailId(emailId)
+                        setIsSearchOpen(false)
+                        // We might need to load the email if it's not in the current list
+                        // But loadFullEmail should handle it if we pass the ID
+                    }}
+                />
             </div>
-        </div>
+        </SkeletonTheme>
     )
 }
 
