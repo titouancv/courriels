@@ -411,7 +411,11 @@ export function EmailView({
                 />
             )}
 
-            <ReplyBox onSend={handleSend} isSending={isSending} />
+            <ReplyBox
+                onSend={handleSend}
+                isSending={isSending}
+                thread={JSON.stringify(email, null, 2)}
+            />
         </div>
     )
 }

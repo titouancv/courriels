@@ -1,17 +1,28 @@
-import { useState, useRef } from 'react'
-import { Paperclip, Send, X } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { Paperclip, Send, X, Sparkles } from 'lucide-react'
 import { Button } from '../design-system/Button'
+import { generateReply } from '../services/mistral'
+import { toast } from 'sonner'
 
 interface ReplyBoxProps {
     onSend: (body: string, attachments: File[]) => Promise<void>
     isSending: boolean
+    thread?: string
 }
 
-export function ReplyBox({ onSend, isSending }: ReplyBoxProps) {
+export function ReplyBox({ onSend, isSending, thread }: ReplyBoxProps) {
     const [body, setBody] = useState('')
     const [attachments, setAttachments] = useState<File[]>([])
+    const [isGenerating, setIsGenerating] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+    useEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto'
+            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+        }
+    }, [body])
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
@@ -49,6 +60,27 @@ export function ReplyBox({ onSend, isSending }: ReplyBoxProps) {
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto'
             textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+        }
+    }
+
+    const handleGenerateReply = async () => {
+        if (!thread) return
+
+        const apiKey = import.meta.env.VITE_MISTRAL_API_KEY
+        if (!apiKey) {
+            toast.error('Mistral API key is missing in environment variables')
+            return
+        }
+
+        setIsGenerating(true)
+        try {
+            const reply = await generateReply(thread, apiKey)
+            setBody(reply)
+        } catch (error) {
+            toast.error('Failed to generate reply')
+            console.error(error)
+        } finally {
+            setIsGenerating(false)
         }
     }
 
@@ -93,6 +125,21 @@ export function ReplyBox({ onSend, isSending }: ReplyBoxProps) {
                         }}
                     />
                     <div className="flex w-full justify-between">
+                        {thread && (
+                            <Button
+                                variant="ai"
+                                size="icon"
+                                onClick={handleGenerateReply}
+                                disabled={isGenerating}
+                                icon={Sparkles}
+                                title="Generate reply with AI"
+                                className={` ${
+                                    isGenerating ? 'animate-pulse' : ''
+                                }`}
+                            >
+                                <span>Generate reply with AI</span>
+                            </Button>
+                        )}
                         <div className="flex items-center gap-2">
                             <div>
                                 <input
@@ -113,18 +160,19 @@ export function ReplyBox({ onSend, isSending }: ReplyBoxProps) {
                                     className="h-8 w-8 text-[#787774] hover:text-[#37352F] dark:text-[#9B9A97] dark:hover:text-[#D4D4D4]"
                                 />
                             </div>
+                            <Button
+                                onClick={handleSend}
+                                disabled={
+                                    (!body.trim() &&
+                                        attachments.length === 0) ||
+                                    isSending
+                                }
+                                variant="primary"
+                                size="icon"
+                                icon={Send}
+                                className=""
+                            />
                         </div>
-                        <Button
-                            onClick={handleSend}
-                            disabled={
-                                (!body.trim() && attachments.length === 0) ||
-                                isSending
-                            }
-                            variant="primary"
-                            size="icon"
-                            icon={Send}
-                            className=""
-                        />
                     </div>
                 </div>
             </div>
