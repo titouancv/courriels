@@ -277,7 +277,7 @@ function App() {
             baseColor={darkMode ? '#333' : '#ebebeb'}
             highlightColor={darkMode ? '#444' : '#f5f5f5'}
         >
-            <div className="flex h-screen bg-white font-sans antialiased transition-colors duration-200 dark:bg-[#191919]">
+            <div className="flex h-dvh bg-white font-sans antialiased transition-colors duration-200 dark:bg-[#191919]">
                 <Toaster position="bottom-right" />
                 <div className="flex min-w-0 flex-1 flex-col">
                     <div className="relative flex min-h-0 flex-1">

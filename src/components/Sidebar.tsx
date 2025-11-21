@@ -47,7 +47,7 @@ export function Sidebar({
     ]
 
     return (
-        <div className="flex h-screen w-auto flex-col items-center border-r border-[#E9E9E7] bg-white text-[#37352F] transition-colors duration-200 dark:border-[#2F2F2F] dark:bg-[#191919] dark:text-[#D4D4D4]">
+        <div className="flex h-full w-auto flex-col items-center border-r border-[#E9E9E7] bg-white text-[#37352F] transition-colors duration-200 dark:border-[#2F2F2F] dark:bg-[#191919] dark:text-[#D4D4D4]">
             <div className="flex w-full flex-col items-center border-b border-[#E9E9E7] dark:border-[#2F2F2F]">
                 <Button
                     variant="primary"
