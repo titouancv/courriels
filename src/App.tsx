@@ -31,36 +31,15 @@ function App() {
         loadFullEmail,
     } = useEmails(accessToken)
 
-    const [currentFolder, setCurrentFolder] = useState<FolderId>(() => {
-        if (typeof window === 'undefined') return 'inbox'
-        const params = new URLSearchParams(window.location.search)
-        const folder = params.get('folder') as FolderId
-        return folder && ['inbox', 'conversations', 'trash'].includes(folder)
-            ? folder
-            : 'inbox'
-    })
-    const [selectedEmailId, setSelectedEmailId] = useState<string | null>(
-        () => {
-            if (typeof window === 'undefined') return null
-            const params = new URLSearchParams(window.location.search)
-            return params.get('emailId') || null
-        }
-    )
+    const [currentFolder, setCurrentFolder] = useState<FolderId>('inbox')
+    const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null)
     const [searchQuery, setSearchQuery] = useState('')
 
-    const [isComposeOpen, setIsComposeOpen] = useState(() => {
-        if (typeof window === 'undefined') return false
-        const params = new URLSearchParams(window.location.search)
-        return params.get('compose') === 'true'
-    })
+    const [isComposeOpen, setIsComposeOpen] = useState(false)
     const [composeInitialTo, setComposeInitialTo] = useState('')
     const [composeInitialSubject, setComposeInitialSubject] = useState('')
     const [composeInitialBody, setComposeInitialBody] = useState('')
-    const [isSettingsOpen, setIsSettingsOpen] = useState(() => {
-        if (typeof window === 'undefined') return false
-        const params = new URLSearchParams(window.location.search)
-        return params.get('settings') === 'true'
-    })
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false)
     const [isSearchOpen, setIsSearchOpen] = useState(false)
     const [searchResults, setSearchResults] = useState<Email[]>([])
     const [isSearching, setIsSearching] = useState(false)
@@ -127,22 +106,70 @@ function App() {
         }
     }, [selectedEmailId, currentFolder, accessToken, loadFullEmail])
 
+    // URL Management
     useEffect(() => {
-        if (typeof window === 'undefined') return
         if (!accessToken) return
 
-        const params = new URLSearchParams()
-        if (currentFolder !== 'conversations')
+        // 1. Read from URL on mount
+        const params = new URLSearchParams(window.location.search)
+
+        const folderParam = params.get('folder') as FolderId
+        if (
+            folderParam &&
+            ['inbox', 'conversations', 'trash'].includes(folderParam)
+        ) {
+            setCurrentFolder(folderParam)
+        }
+
+        const emailIdParam = params.get('emailId')
+        if (emailIdParam) {
+            setSelectedEmailId(emailIdParam)
+        }
+
+        if (params.get('compose') === 'true') {
+            setIsComposeOpen(true)
+        }
+
+        if (params.get('settings') === 'true') {
+            setIsSettingsOpen(true)
+        }
+    }, [accessToken]) // Run once when authenticated
+
+    // 2. Write to URL on state change
+    useEffect(() => {
+        if (!accessToken) return
+
+        const params = new URLSearchParams(window.location.search)
+
+        // Folder
+        if (currentFolder !== 'inbox') {
             params.set('folder', currentFolder)
-        if (selectedEmailId) params.set('emailId', selectedEmailId)
-        if (isComposeOpen) params.set('compose', 'true')
-        if (isSettingsOpen) params.set('settings', 'true')
+        } else {
+            params.delete('folder')
+        }
 
-        const queryString = params.toString()
-        const newUrl = queryString
-            ? `${window.location.pathname}?${queryString}`
-            : window.location.pathname
+        // Email ID
+        if (selectedEmailId) {
+            params.set('emailId', selectedEmailId)
+        } else {
+            params.delete('emailId')
+        }
 
+        // Compose
+        if (isComposeOpen) {
+            params.set('compose', 'true')
+        } else {
+            params.delete('compose')
+        }
+
+        // Settings
+        if (isSettingsOpen) {
+            params.set('settings', 'true')
+        } else {
+            params.delete('settings')
+        }
+
+        const newUrl = `${window.location.pathname}?${params.toString()}`
         window.history.replaceState({}, '', newUrl)
     }, [
         currentFolder,
