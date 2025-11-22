@@ -16,7 +16,6 @@ export interface EmailMessage {
         avatar?: string
     }
     content: string
-    originalContent?: string
     date: Date
     attachments: Attachment[]
     messageIdHeader?: string

@@ -3,7 +3,6 @@ import type { Attachment } from '../types'
 
 interface MessageContentProps {
     content: string
-    originalContent?: string
     attachments: Attachment[]
     messageId: string
     onFetchAttachment: (
@@ -14,23 +13,21 @@ interface MessageContentProps {
 
 export function MessageContent({
     content,
-    originalContent,
     attachments,
     messageId,
     onFetchAttachment,
 }: MessageContentProps) {
-    const activeContent = originalContent || content
-    const [processedContent, setProcessedContent] = useState(activeContent)
+    const [processedContent, setProcessedContent] = useState(content)
 
     useEffect(() => {
         const processContent = async () => {
-            if (!activeContent.includes('cid:')) {
-                setProcessedContent(activeContent)
+            if (!content.includes('cid:')) {
+                setProcessedContent(content)
                 return
             }
 
             const parser = new DOMParser()
-            const doc = parser.parseFromString(activeContent, 'text/html')
+            const doc = parser.parseFromString(content, 'text/html')
             const images = doc.querySelectorAll('img[src^="cid:"]')
 
             let hasChanges = false
@@ -55,12 +52,12 @@ export function MessageContent({
             if (hasChanges) {
                 setProcessedContent(doc.body.innerHTML)
             } else {
-                setProcessedContent(activeContent)
+                setProcessedContent(content)
             }
         }
 
         processContent()
-    }, [activeContent, attachments, messageId, onFetchAttachment])
+    }, [content, attachments, messageId, onFetchAttachment])
 
     return (
         <div className="">

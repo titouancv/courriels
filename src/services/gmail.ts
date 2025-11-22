@@ -1,4 +1,4 @@
-import type { Attachment, Email, User } from '../types'
+import type { Attachment, User } from '../types'
 
 export function decodeEmailBody(data: string) {
     const base64 = data.replace(/-/g, '+').replace(/_/g, '/')
@@ -70,19 +70,50 @@ export function cleanEmailContent(html: string) {
         const parser = new DOMParser()
         const doc = parser.parseFromString(html, 'text/html')
 
-        // Remove Gmail extra quotes
-        const gmailQuotes = doc.querySelectorAll('.gmail_quote')
-        gmailQuotes.forEach((quote) => quote.remove())
+        // 1️⃣ Supprimer blockquotes (Gmail, Apple Mail, Outlook…)
+        doc.querySelectorAll('blockquote').forEach((el) => el.remove())
 
-        // Remove blockquotes which often contain the history
-        const blockquotes = doc.querySelectorAll('blockquote')
-        blockquotes.forEach((quote) => quote.remove())
+        // 2️⃣ Gmail quote
+        doc.querySelectorAll('.gmail_quote, .gmail_attr').forEach((el) =>
+            el.remove()
+        )
 
-        // Remove ProtonMail quotes
-        const protonQuotes = doc.querySelectorAll('.protonmail_quote')
-        protonQuotes.forEach((quote) => quote.remove())
+        // 3️⃣ ProtonMail
+        doc.querySelectorAll('.protonmail_quote').forEach((el) => el.remove())
 
-        return doc.body.innerHTML
+        // 4️⃣ Toute div avec left-border = reply quote
+        doc.querySelectorAll('div').forEach((div) => {
+            const style = div.getAttribute('style') || ''
+            if (
+                style.includes('border-left') ||
+                style.includes('border-inline-start')
+            ) {
+                div.remove()
+            }
+        })
+
+        // 5️⃣ Détection TEXTUELLE des entêtes de reply
+        const replyHeaderRegex =
+            /(On\s.+?wrote:)|(Le\s.+?a écrit)|(From:\s.+)|(Sent:\s.+)|(To:\s.+)|(De :\s.+)/i
+
+        const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_ELEMENT)
+        const toRemove: HTMLElement[] = []
+
+        while (walker.nextNode()) {
+            const el = walker.currentNode as HTMLElement
+            if (!el.innerText) continue
+
+            if (replyHeaderRegex.test(el.innerText.trim())) {
+                toRemove.push(el)
+            }
+        }
+
+        toRemove.forEach((el) => el.remove())
+
+        // 6️⃣ Supprimer les séparateurs horizontaux typiques
+        doc.querySelectorAll('hr').forEach((hr) => hr.remove())
+
+        return doc.body.innerHTML.trim()
     } catch (e) {
         console.error('Error cleaning email content:', e)
         return html
@@ -124,110 +155,6 @@ export async function fetchThreadsList(
     })
     if (!listResponse.ok) throw new Error('Failed to fetch threads list')
     return await listResponse.json()
-}
-
-export async function fetchThreadDetails(
-    accessToken: string,
-    threadId: string
-): Promise<Email> {
-    const threadResponse = await fetch(
-        `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-    )
-    const threadData = await threadResponse.json()
-
-    // Process messages in the thread
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const messages = threadData.messages.map((msgData: any) => {
-        const headers = msgData.payload.headers
-        const getHeader = (name: string) =>
-            headers.find(
-                (h: { name: string; value: string }) => h.name === name
-            )?.value || ''
-
-        const from = getHeader('From')
-        const messageIdHeader =
-            getHeader('Message-ID') || getHeader('Message-Id')
-        const references = getHeader('References')
-        const date = new Date(
-            getHeader('Date') || parseInt(msgData.internalDate)
-        )
-
-        // Simple sender parsing
-        const senderMatch = from.match(/(.*) <(.*)>/)
-        const senderName = senderMatch
-            ? senderMatch[1].replace(/"/g, '').trim()
-            : from.split('@')[0]
-        const senderEmail = senderMatch ? senderMatch[2] : from
-
-        const content = getMessageBody(msgData.payload)
-        const attachments = getAttachments(msgData.payload)
-
-        const rawContent = content || msgData.snippet
-        let cleanedContent = cleanEmailContent(rawContent).trim()
-
-        if (!cleanedContent) {
-            cleanedContent = rawContent
-        }
-
-        return {
-            id: msgData.id,
-            sender: {
-                name: senderName,
-                email: senderEmail,
-            },
-            content: cleanedContent,
-            originalContent: rawContent,
-            date: date,
-            attachments,
-            messageIdHeader,
-            references,
-        }
-    })
-
-    // Use the last message for thread-level info
-    const lastMsg = threadData.messages[threadData.messages.length - 1]
-
-    // Use the first message for the subject to keep the original conversation title
-    const firstMsg = threadData.messages[0]
-    const firstHeaders = firstMsg.payload.headers
-    const getFirstHeader = (name: string) =>
-        firstHeaders.find(
-            (h: { name: string; value: string }) => h.name === name
-        )?.value || ''
-    const subject = getFirstHeader('Subject')
-
-    const labelIds = lastMsg.labelIds || []
-
-    let folder: 'inbox' | 'sent' | 'drafts' | 'trash' = 'inbox'
-    if (labelIds.includes('TRASH')) folder = 'trash'
-    else if (labelIds.includes('SENT') && !labelIds.includes('INBOX'))
-        folder = 'sent'
-    else if (labelIds.includes('DRAFT')) folder = 'drafts'
-
-    return {
-        id: threadData.id,
-        threadId: threadData.id,
-        sender: messages[messages.length - 1].sender, // Use sender of last message
-        subject: subject || '(No Subject)',
-        preview: lastMsg.snippet,
-        messages: messages,
-        date: messages[messages.length - 1].date,
-        read: !labelIds.includes('UNREAD'),
-        labels: labelIds.filter(
-            (l: string) =>
-                ![
-                    'INBOX',
-                    'UNREAD',
-                    'IMPORTANT',
-                    'CATEGORY_PERSONAL',
-                    'CATEGORY_UPDATES',
-                    'CATEGORY_FORUMS',
-                    'CATEGORY_PROMOTIONS',
-                ].includes(l)
-        ),
-        folder: folder,
-    } as Email
 }
 
 export async function fetchAttachmentData(

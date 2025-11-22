@@ -79,7 +79,9 @@ export function AttachmentItem({
         <div className="mb-2 flex items-center justify-between rounded border border-black/5 bg-white/50 p-2 text-sm text-[#37352F] dark:border-white/10 dark:bg-[#191919]/50 dark:text-[#D4D4D4]">
             <div className="flex items-center gap-2 overflow-hidden">
                 <Paperclip className="h-4 w-4 flex-shrink-0 text-[#787774] dark:text-[#9B9A97]" />
-                <span className="truncate">{attachment.filename}</span>
+                <span className="max-w-[100px] truncate md:max-w-[300px]">
+                    {attachment.filename}
+                </span>
                 <span className="text-xs text-[#9B9A97]">
                     ({Math.round(attachment.size / 1024)}KB)
                 </span>

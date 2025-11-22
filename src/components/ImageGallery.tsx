@@ -57,7 +57,7 @@ export function ImageStack({
             )}
 
             {/* Main Image */}
-            <div className="relative h-48 w-48 overflow-hidden rounded-lg border border-[#E9E9E7] bg-[#F7F7F5] shadow-sm dark:border-[#2F2F2F] dark:bg-[#202020]">
+            <div className="relative size-24 overflow-hidden rounded-lg border border-[#E9E9E7] bg-[#F7F7F5] shadow-sm dark:border-[#2F2F2F] dark:bg-[#202020]">
                 <img
                     src={coverUrl}
                     alt={coverImage.filename}

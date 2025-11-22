@@ -10,14 +10,7 @@ import { AttachmentItem } from './AttachmentItem'
 import { ReplyBox } from './ReplyBox'
 import { ImageStack, Lightbox } from './ImageGallery'
 
-import {
-    FileCode,
-    MoreHorizontal,
-    Forward,
-    Trash2,
-    MailOpen,
-    Info,
-} from 'lucide-react'
+import { MoreHorizontal, Forward, Trash2, MailOpen, Info } from 'lucide-react'
 
 interface EmailViewProps {
     email: Email | null
@@ -44,7 +37,6 @@ export function EmailView({
     onClose,
 }: EmailViewProps) {
     const [isSending, setIsSending] = useState(false)
-    const [showOriginal, setShowOriginal] = useState(false)
     const [showDetails, setShowDetails] = useState(false)
     const [lightboxState, setLightboxState] = useState<{
         images: Attachment[]
@@ -209,98 +201,86 @@ export function EmailView({
                                 >
                                     <MessageContent
                                         content={message.content}
-                                        originalContent={
-                                            showOriginal
-                                                ? message.originalContent
-                                                : undefined
-                                        }
                                         attachments={message.attachments}
                                         messageId={message.id}
                                         onFetchAttachment={onFetchAttachment}
                                     />
 
-                                    {message.attachments &&
-                                        message.attachments.length > 0 && (
-                                            <div className="mt-4 border-t border-black/5 pt-4 dark:border-white/10">
-                                                {(() => {
-                                                    const images =
-                                                        message.attachments.filter(
-                                                            (a) =>
-                                                                !a.contentId &&
-                                                                a.mimeType.startsWith(
-                                                                    'image/'
-                                                                )
-                                                        )
-                                                    const others =
-                                                        message.attachments.filter(
-                                                            (a) =>
-                                                                !a.contentId &&
-                                                                !a.mimeType.startsWith(
-                                                                    'image/'
-                                                                )
-                                                        )
-
-                                                    return (
-                                                        <>
-                                                            {images.length >
-                                                                0 && (
-                                                                <div className="mb-4">
-                                                                    <ImageStack
-                                                                        images={
-                                                                            images
-                                                                        }
-                                                                        messageId={
-                                                                            message.id
-                                                                        }
-                                                                        onFetchAttachment={
-                                                                            onFetchAttachment
-                                                                        }
-                                                                        onOpenLightbox={(
-                                                                            index
-                                                                        ) =>
-                                                                            setLightboxState(
-                                                                                {
-                                                                                    images,
-                                                                                    initialIndex:
-                                                                                        index,
-                                                                                    messageId:
-                                                                                        message.id,
-                                                                                }
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                </div>
-                                                            )}
-                                                            {others.length >
-                                                                0 && (
-                                                                <div className="flex flex-wrap gap-4">
-                                                                    {others.map(
-                                                                        (
-                                                                            attachment
-                                                                        ) => (
-                                                                            <AttachmentItem
-                                                                                key={
-                                                                                    attachment.id
-                                                                                }
-                                                                                attachment={
-                                                                                    attachment
-                                                                                }
-                                                                                messageId={
-                                                                                    message.id
-                                                                                }
-                                                                                onFetchAttachment={
-                                                                                    onFetchAttachment
-                                                                                }
-                                                                            />
-                                                                        )
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        </>
+                                    {(() => {
+                                        const images =
+                                            message.attachments.filter((a) =>
+                                                a.mimeType.startsWith('image/')
+                                            )
+                                        const others =
+                                            message.attachments.filter(
+                                                (a) =>
+                                                    !a.mimeType.startsWith(
+                                                        'image/'
                                                     )
-                                                })()}
-                                            </div>
-                                        )}
+                                            )
+
+                                        return (
+                                            <>
+                                                {(images.length > 0 ||
+                                                    others.length > 0) && (
+                                                    <div className="mt-4 border-t border-black/5 pt-4 dark:border-white/10">
+                                                        {images.length > 0 && (
+                                                            <div className="mb-4">
+                                                                <ImageStack
+                                                                    images={
+                                                                        images
+                                                                    }
+                                                                    messageId={
+                                                                        message.id
+                                                                    }
+                                                                    onFetchAttachment={
+                                                                        onFetchAttachment
+                                                                    }
+                                                                    onOpenLightbox={(
+                                                                        index
+                                                                    ) =>
+                                                                        setLightboxState(
+                                                                            {
+                                                                                images,
+                                                                                initialIndex:
+                                                                                    index,
+                                                                                messageId:
+                                                                                    message.id,
+                                                                            }
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </div>
+                                                        )}
+                                                        {others.length > 0 && (
+                                                            <div className="flex flex-wrap gap-4">
+                                                                {others.map(
+                                                                    (
+                                                                        attachment
+                                                                    ) => (
+                                                                        <AttachmentItem
+                                                                            key={
+                                                                                attachment.id
+                                                                            }
+                                                                            attachment={
+                                                                                attachment
+                                                                            }
+                                                                            messageId={
+                                                                                message.id
+                                                                            }
+                                                                            onFetchAttachment={
+                                                                                onFetchAttachment
+                                                                            }
+                                                                        />
+                                                                    )
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </>
+                                        )
+                                    })()}
                                 </div>
 
                                 <div className="relative">
@@ -347,24 +327,6 @@ export function EmailView({
                                                     <Forward className="h-4 w-4" />
                                                     Forward
                                                 </button>
-                                                {message.originalContent && (
-                                                    <button
-                                                        onClick={() => {
-                                                            setShowOriginal(
-                                                                !showOriginal
-                                                            )
-                                                            setActiveMenuMessageId(
-                                                                null
-                                                            )
-                                                        }}
-                                                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-[#37352F] hover:bg-[#F7F7F5] dark:text-[#D4D4D4] dark:hover:bg-[#202020]"
-                                                    >
-                                                        <FileCode className="h-4 w-4" />
-                                                        {showOriginal
-                                                            ? 'Show cleaned view'
-                                                            : 'Show original format'}
-                                                    </button>
-                                                )}
                                             </div>
                                         </>
                                     )}
