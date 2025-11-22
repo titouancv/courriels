@@ -1,5 +1,4 @@
-import { Button } from '../design-system/Button'
-import { LogIn } from 'lucide-react'
+import { Shield, Zap, Sparkles } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 export function LoginPage() {
@@ -14,42 +13,96 @@ export function LoginPage() {
     }
 
     return (
-        <div className="flex h-screen w-screen flex-col items-center justify-center bg-[#F7F7F5] transition-colors duration-200 dark:bg-[#191919]">
-            <div className="space-y-6 text-center">
-                <div className="flex flex-col items-center gap-4">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#00712D] shadow-lg">
-                        <svg
-                            width="32"
-                            height="32"
-                            viewBox="0 0 32 32"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                        >
-                            <path
-                                fillRule="evenodd"
-                                clipRule="evenodd"
-                                d="M16 4C9.37258 4 4 9.37258 4 16C4 22.6274 9.37258 28 16 28C21.5 28 26.15 24.3 27.5 19.2C27.7 18.4 27.2 17.6 26.4 17.6C25.7 17.6 25.1 18.1 24.9 18.8C23.9 22.3 20.3 25 16 25C11.0294 25 7 20.9706 7 16C7 11.0294 11.0294 7 16 7C20.3 7 23.9 9.7 24.9 13.2C25.1 13.9 25.7 14.4 26.4 14.4C27.2 14.4 27.7 13.6 27.5 12.8C26.15 7.7 21.5 4 16 4Z"
-                                fill="white"
-                            />
-                        </svg>
-                    </div>
-                    <h1 className="text-2xl font-semibold text-[#37352F] dark:text-[#D4D4D4]">
-                        courriels
+        <div className="relative flex h-screen w-screen flex-col items-center justify-center overflow-hidden bg-[#F7F7F5] transition-colors duration-200 dark:bg-[#191919]">
+            {/* Background decoration - Sharp geometric shapes */}
+            <div className="absolute -top-[20%] -left-[10%] h-[500px] w-[500px] bg-green-200/10 blur-3xl dark:bg-green-900/10" />
+            <div className="absolute top-[40%] -right-[10%] h-[400px] w-[400px] bg-blue-200/10 blur-3xl dark:bg-blue-900/10" />
+
+            <div className="z-10 w-full max-w-md px-4">
+                <div className="mb-12 text-center">
+                    <h1 className="mb-2 text-4xl font-bold text-[#37352F] dark:text-[#D4D4D4]">
+                        corriels
                     </h1>
+                    <p className="text-md text-[#787774] dark:text-[#9B9A97]">
+                        SYSTEM_READY // AWAITING_INPUT
+                    </p>
                 </div>
 
-                <div className="w-80 rounded-xl border border-[#E9E9E7] bg-white p-8 shadow-sm dark:border-[#2F2F2F] dark:bg-[#202020]">
-                    <p className="mb-6 text-center text-sm text-[#787774] dark:text-[#9B9A97]">
-                        Connect your Gmail account to get started
-                    </p>
-                    <Button
-                        onClick={handleLogin}
-                        className="w-full justify-center gap-2"
-                        icon={LogIn}
-                    >
-                        Sign in with Google
-                    </Button>
+                <div className="border border-[#E9E9E7] bg-white p-8 shadow-none dark:border-[#2F2F2F] dark:bg-[#202020]">
+                    <div className="mb-8 space-y-4">
+                        <div className="text-md flex items-center gap-3 text-[#37352F] dark:text-[#D4D4D4]">
+                            <div className="flex h-8 w-8 items-center justify-center bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                <Zap className="h-4 w-4" />
+                            </div>
+                            <span className="text-xs">
+                                Lightning fast interface
+                            </span>
+                        </div>
+                        <div className="text-md flex items-center gap-3 text-[#37352F] dark:text-[#D4D4D4]">
+                            <div className="flex h-8 w-8 items-center justify-center bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                                <Shield className="h-4 w-4" />
+                            </div>
+                            <span className="text-xs">
+                                Secure & Private by design
+                            </span>
+                        </div>
+                        <div className="text-md flex items-center gap-3 text-[#37352F] dark:text-[#D4D4D4]">
+                            <div className="flex h-8 w-8 items-center justify-center bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                                <Sparkles className="h-4 w-4" />
+                            </div>
+                            <span className="text-xs">
+                                AI-powered assistance
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="space-y-6">
+                        {/* Google Sign-In Button following guidelines */}
+                        <button
+                            onClick={handleLogin}
+                            className="group flex w-full items-center justify-center gap-3 bg-[#F7F7F5] p-0.5 transition-all hover:bg-[#F4F4F0] focus:ring-2 focus:ring-[#4285F4] focus:ring-offset-2 focus:outline-none dark:focus:ring-offset-[#191919]"
+                        >
+                            <div className="flex h-10 w-10 items-center justify-center">
+                                <svg
+                                    width="18"
+                                    height="18"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    viewBox="0 0 48 48"
+                                >
+                                    <path
+                                        fill="#EA4335"
+                                        d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+                                    />
+                                    <path
+                                        fill="#4285F4"
+                                        d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+                                    />
+                                    <path
+                                        fill="#FBBC05"
+                                        d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+                                    />
+                                    <path
+                                        fill="#34A853"
+                                        d="M24 48c6.48 0 12.01-2.09 15.98-5.77l-7.73-6c-2.15 1.45-4.92 2.3-8.25 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+                                    />
+                                    <path fill="none" d="M0 0h48v48H0z" />
+                                </svg>
+                            </div>
+                            <span className="font-roboto text-md font-medium text-black">
+                                Sign in with Google
+                            </span>
+                        </button>
+
+                        <p className="text-center text-sm tracking-widest dark:text-[#9B9A97]">
+                            By continuing, you agree to our Terms of Service and
+                            Privacy Policy.
+                        </p>
+                    </div>
                 </div>
+            </div>
+
+            <div className="absolute bottom-8 text-center text-[10px] tracking-widest dark:text-[#9B9A97]">
+                © {new Date().getFullYear()} Corriels. System v0
             </div>
         </div>
     )
